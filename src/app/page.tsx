@@ -105,19 +105,53 @@ export default function Home() {
   const [lastMilestone, setLastMilestone] = useState(0);
   const [leaderboardData, setLeaderboardData] = useState<{ name: string, score: number, tier: string }[]>([]);
 
-  const generateLeaderboard = useCallback(() => {
-    const names = ['vitalik', 'dwr', 'varunsrin', 'shishi', 'v', 'brian', 'jesse', 'coopahtroopa', 'cryptocube', 'basegod'];
-    const data = names.map(n => ({
-      name: n,
-      score: Math.floor(Math.random() * 50000) + 5000,
-      tier: Math.random() > 0.8 ? 'Diamond' : Math.random() > 0.5 ? 'Gold' : 'Silver'
-    })).sort((a, b) => b.score - a.score);
-    setLeaderboardData(data);
-  }, []);
+  // --- Real-time Leaderboard Sync ---
+  const syncScore = useCallback(async () => {
+    if (!context?.user?.fid) return;
+
+    try {
+      await fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fid: context.user.fid,
+          username: context.user.username,
+          score: Math.floor(totalEarned),
+          tier: getTier(totalEarned).name
+        })
+      });
+    } catch (e) {
+      console.error('Score sync failed', e);
+    }
+  }, [context, totalEarned]);
+
+  // Fetch Leaderboard
+  const fetchLeaderboard = async () => {
+    try {
+      const res = await fetch('/api/leaderboard');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setLeaderboardData(data);
+      }
+    } catch (e) {
+      console.error('Leaderboard fetch failed', e);
+    }
+  };
 
   useEffect(() => {
-    generateLeaderboard();
-  }, [generateLeaderboard]);
+    if (tab === 'rank') {
+      fetchLeaderboard();
+      syncScore();
+    }
+  }, [tab, syncScore]);
+
+  // Sync score periodically
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (totalEarned > 100) syncScore();
+    }, 60000); // Every 1 min
+    return () => clearInterval(timer);
+  }, [syncScore, totalEarned]);
   const [jackpotTime, setJackpotTime] = useState(getJackpotTime());
   const [showSpinModal, setShowSpinModal] = useState(false);
   const [spinning, setSpinning] = useState(false);
@@ -1309,7 +1343,7 @@ export default function Home() {
             <div className="flex justify-between items-center mt-8 mb-4">
               <h3 className="text-lg font-black dark:text-white">Leaderboard</h3>
               <button
-                onClick={() => { haptic('medium'); generateLeaderboard(); showToast('🔄', 'Ranking refreshed!'); }}
+                onClick={() => { haptic('medium'); fetchLeaderboard(); showToast('🔄', 'Ranking refreshed!'); }}
                 className="text-blue-500 text-sm font-bold flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-full"
               >
                 <RotateCw size={14} /> Refresh
