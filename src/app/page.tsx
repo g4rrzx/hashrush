@@ -761,16 +761,79 @@ export default function Home() {
       )}
 
       {showTapGame && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-            <div className="text-4xl mb-2">👆</div>
-            <h2 className="text-xl font-bold mb-2">Tap Rush!</h2>
-            <div className="bg-gray-100 rounded-2xl p-4 mb-4"><div className="text-5xl font-black text-blue-600">{tapCount}</div></div>
-            <div className="text-2xl font-bold text-red-500 mb-4">{tapTimeLeft}s</div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 overflow-hidden">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+
+          <div className="relative bg-white dark:bg-slate-900 rounded-[32px] p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(59,130,246,0.3)] animate-in zoom-in duration-300">
+            {/* Game Header */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Target size={18} className="text-blue-500" />
+                </div>
+                <span className="font-bold dark:text-white">Daily Rush</span>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-sm font-bold ${tapTimeLeft < 4 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-blue-100 text-blue-600'}`}>
+                {tapTimeLeft}s left
+              </div>
+            </div>
+
             {tapGameActive ? (
-              <button onClick={() => { haptic('light'); setTapCount(c => c + 1); }} className="w-full py-8 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-xl active:scale-95 shadow-xl">TAP!</button>
+              <>
+                <div className="mb-8">
+                  <div className="text-sm text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider font-bold">Current Combo</div>
+                  <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-blue-400 to-blue-600 drop-shadow-sm">
+                    {tapCount}
+                  </div>
+                </div>
+
+                {/* Big Animated Tap Button */}
+                <div className="relative py-12">
+                  <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full" />
+                  <button
+                    onPointerDown={(e) => {
+                      haptic('medium');
+                      setTapCount(c => c + 1);
+                      // Add temporary scale effect via style if needed, or rely on active:scale
+                    }}
+                    className="relative w-40 h-40 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_15px_35px_-5px_rgba(59,130,246,0.5)] flex items-center justify-center active:scale-90 active:shadow-inner transition-transform duration-75 group ring-8 ring-blue-500/10"
+                  >
+                    <div className="w-32 h-32 rounded-full border-2 border-white/20 flex items-center justify-center">
+                      <Zap size={48} className="text-white fill-white group-active:scale-125 transition-transform" />
+                    </div>
+                  </button>
+                </div>
+
+                <p className="mt-6 text-slate-400 text-sm font-medium">Tap as fast as you can!</p>
+              </>
             ) : (
-              <button onClick={() => setShowTapGame(false)} className="btn-primary">Close</button>
+              <div className="py-6 animate-in fade-in zoom-in duration-500">
+                <div className="w-20 h-20 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <Sparkles size={40} className="text-green-500" />
+                </div>
+                <h2 className="text-2xl font-black mb-1 dark:text-white">Game Over!</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">Great tapping speed!</p>
+
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-6 mb-8 border border-slate-100 dark:border-slate-700/50">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-slate-400 uppercase font-bold mb-1">Total Taps</div>
+                      <div className="text-2xl font-black dark:text-white">{tapCount}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-400 uppercase font-bold mb-1">Earned</div>
+                      <div className="text-2xl font-black text-blue-500">+{Math.floor(tapCount * 0.5)} HP</div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowTapGame(false)}
+                  className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-bold hover:opacity-90 transition-opacity"
+                >
+                  Collect Reward
+                </button>
+              </div>
             )}
           </div>
         </div>
