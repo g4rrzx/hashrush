@@ -468,13 +468,14 @@ export default function Home() {
     const timeout = setTimeout(() => setIsTransacting(false), 30000);
 
     try {
-      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
-      const signer = await browserProvider.getSigner();
-
-      const tx = await signer.sendTransaction({
-        to: OWNER_ADDRESS,
-        value: ethers.parseEther("0.0001")
-        // chainId removed for compatibility with Warpcast bridge
+      const value = ethers.parseEther("0.0001");
+      const tx = await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          to: OWNER_ADDRESS as `0x${string}`,
+          value: ("0x" + value.toString(16)) as `0x${string}`,
+          chainId: "0x2105" // Base Mainnet
+        }]
       });
 
       if (tx) {
@@ -527,13 +528,14 @@ export default function Home() {
     const timeout = setTimeout(() => setIsTransacting(false), 30000);
 
     try {
-      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
-      const signer = await browserProvider.getSigner();
-
-      const tx = await signer.sendTransaction({
-        to: OWNER_ADDRESS,
-        value: ethers.parseEther(item.price)
-        // chainId removed
+      const cost = ethers.parseEther(item.price);
+      const tx = await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          to: OWNER_ADDRESS as `0x${string}`,
+          value: ("0x" + cost.toString(16)) as `0x${string}`,
+          chainId: "0x2105" // Base Mainnet
+        }]
       });
 
       if (tx) {
@@ -604,18 +606,19 @@ export default function Home() {
     const timeout = setTimeout(() => setIsTransacting(false), 30000);
 
     try {
-      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
-      const signer = await browserProvider.getSigner();
-
       // Create contract interface and data
       const iface = new ethers.Interface(CONTRACT_ABI);
       const data = iface.encodeFunctionData("redeem", [BigInt(balance)]);
 
-      // Call contract via ethers
-      const tx = await signer.sendTransaction({
-        to: CONTRACT_ADDRESS,
-        data: data
-        // chainId removed
+      // Call contract directly via SDK provider
+      const tx = await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          to: CONTRACT_ADDRESS as `0x${string}`,
+          data: data as `0x${string}`,
+          value: "0x0",
+          chainId: "0x2105" // Base Mainnet
+        }]
       });
 
       if (tx) {
@@ -668,13 +671,14 @@ export default function Home() {
     const timeout = setTimeout(() => setIsTransacting(false), 30000);
 
     try {
-      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
-      const signer = await browserProvider.getSigner();
-
-      const tx = await signer.sendTransaction({
-        to: OWNER_ADDRESS,
-        value: ethers.parseEther("0.001")
-        // chainId removed
+      const fee = ethers.parseEther("0.001");
+      const tx = await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          to: OWNER_ADDRESS as `0x${string}`,
+          value: ("0x" + fee.toString(16)) as `0x${string}`,
+          chainId: "0x2105" // Base Mainnet
+        }]
       });
 
       if (tx) {
