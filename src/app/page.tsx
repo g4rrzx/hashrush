@@ -141,7 +141,7 @@ export default function Home() {
   const [tapTimeLeft, setTapTimeLeft] = useState(10);
   const [tapGameActive, setTapGameActive] = useState(false);
   const [lastTapGameDate, setLastTapGameDate] = useState<string | null>(null);
-  const [canPlayTapGame, setCanPlayTapGame] = useState(true);
+  const [canPlayTapGame, setCanPlayTapGame] = useState(false); // Default false, set true after load check
   const [contractPoolBalance, setContractPoolBalance] = useState<string>('0');
   const [userCooldown, setUserCooldown] = useState<number>(0);
 
@@ -398,6 +398,9 @@ export default function Home() {
           if (data.lastTapGameDate === today) {
             setCanPlayTapGame(false);
             setLastTapGameDate(data.lastTapGameDate);
+          } else {
+            setCanPlayTapGame(true);
+            setTimeout(() => setShowTapGame(true), 1500); // Auto popup daily game
           }
 
           if (gain > 50) { setOfflineGain(gain); setShowWelcome(true); }
@@ -467,7 +470,10 @@ export default function Home() {
       if (tapCount >= 50 && !unlockedBadges.includes('tapper')) setUnlockedBadges(prev => [...prev, 'tapper']);
       haptic('heavy');
       triggerConfetti();
-      setShowTapGame(false);
+      if (tapCount >= 50 && !unlockedBadges.includes('tapper')) setUnlockedBadges(prev => [...prev, 'tapper']);
+      haptic('heavy');
+      triggerConfetti();
+      setTimeout(() => setShowTapGame(false), 2000); // Close after 2s result
     }
   }, [tapTimeLeft, tapGameActive, tapCount, soundEnabled, unlockedBadges, haptic]);
 
@@ -1140,6 +1146,48 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Daily Tap Game Modal */}
+            {showTapGame && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-blue-500 relative overflow-hidden">
+
+                  <button
+                    onClick={() => setShowTapGame(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <span style={{ fontSize: '1.5rem' }}>×</span>
+                  </button>
+
+                  {!tapGameActive ? (
+                    <div className="animate-in zoom-in duration-300">
+                      <div className="text-4xl mb-2">⚡</div>
+                      <h2 className="text-2xl font-black mb-2 text-blue-600 dark:text-blue-400 uppercase italic">Daily Surge!</h2>
+                      <p className="text-slate-600 dark:text-slate-300 mb-6">Tap as fast as you can in 10 seconds to generate extra power!</p>
+                      <button
+                        onClick={() => { setTapGameActive(true); setTapTimeLeft(10); setTapCount(0); haptic('heavy'); }}
+                        className="btn-primary w-full text-lg py-4 shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform"
+                      >
+                        START SURGE
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-6xl font-black mb-4 text-blue-500 tabular-nums">{tapTimeLeft}s</div>
+                      <div className="text-sm uppercase tracking-widest text-slate-400 mb-8 font-bold">Time Remaining</div>
+
+                      <button
+                        onClick={() => { setTapCount(c => c + 1); haptic('light'); playKaching(); }}
+                        className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-[0_0_40px_rgba(59,130,246,0.6)] active:scale-90 transition-all flex items-center justify-center mx-auto border-4 border-white dark:border-slate-800"
+                      >
+                        <div className="text-white font-black text-5xl pointer-events-none drop-shadow-md">{tapCount}</div>
+                      </button>
+                      <p className="mt-6 text-slate-500 animate-pulse font-bold">TAP FAST!</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="action-grid">
               <button onClick={handleClaimPoints} className="action-btn" style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #93c5fd' }}>
                 <div className="action-btn-icon" style={{ background: '#3b82f6' }}><ArrowDownToLine size={22} className="text-white" /></div>
@@ -1345,6 +1393,44 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* Settings Modal - Popup Style */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full"><Settings size={20} /></button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                <div className="flex items-center gap-3">
+                  {darkMode ? <Moon size={20} className="text-indigo-400" /> : <Sun size={20} className="text-orange-400" />}
+                  <span className="font-bold">Dark Mode</span>
+                </div>
+                <button onClick={() => setDarkMode(!darkMode)} className={`w-12 h-7 rounded-full transition-colors relative ${darkMode ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+                  <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform ${darkMode ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                <div className="flex items-center gap-3">
+                  {soundEnabled ? <Bell size={20} className="text-emerald-500" /> : <BellOff size={20} className="text-slate-400" />}
+                  <span className="font-bold">Sound Effects</span>
+                </div>
+                <button onClick={() => setSoundEnabled(!soundEnabled)} className={`w-12 h-7 rounded-full transition-colors relative ${soundEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                  <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform ${soundEnabled ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-8 text-center">
+              <p className="text-xs text-slate-400">HashRush v1.2</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="nav-bar">{[{ id: 'mine', icon: Zap, label: 'Mine' }, { id: 'store', icon: ShoppingBag, label: 'Shop' }, { id: 'rank', icon: Trophy, label: 'Rank' }, { id: 'profile', icon: User, label: 'Profile' }].map(item => (<button key={item.id} onClick={() => { haptic('light'); setTab(item.id as Tab); }} className={`nav-item ${tab === item.id ? 'active' : ''}`}><item.icon size={20} /><span>{item.label}</span></button>))}</div>
     </>
