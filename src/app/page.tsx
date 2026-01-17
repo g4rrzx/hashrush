@@ -504,7 +504,7 @@ export default function Home() {
     haptic('medium');
 
     try {
-      const value = ethers.parseEther("0.0001");
+      const value = ethers.parseEther("0.00001");
 
       console.log("Sending Claim TX");
 
