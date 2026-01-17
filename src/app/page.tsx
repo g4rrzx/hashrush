@@ -5,7 +5,7 @@ import sdk, { type Context } from "@farcaster/frame-sdk";
 import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign } from "lucide-react";
 import { ethers } from "ethers";
 
-const OWNER_ADDRESS = "0x7D400FD1F5927f0fd544ad2068b353b63b15cdf9";
+const OWNER_ADDRESS = "0xe0e8222404bfb2bf10b3a38a758b0cff0336cd5b";
 const CONTRACT_ADDRESS = "0x3F65f80F006E5B2f74a4ED2D830dBec260A331B8";
 const USDC_REWARD = 0.01; // 0.01 USDC per redeem
 const MIN_HP_REDEEM = 5000;
