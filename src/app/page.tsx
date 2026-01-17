@@ -5,7 +5,7 @@ import sdk, { type Context } from "@farcaster/frame-sdk";
 import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign, RotateCw, UserPlus, Copy } from "lucide-react";
 import { ethers } from "ethers";
 
-const OWNER_ADDRESS = "0xe0e8222404bfb2bf10b3a38a758b0cff0336cd5b";
+const OWNER_ADDRESS = "0xE0e8222404bFb2bF10B3a38A758B0CfF0336Cd5b"; // Checksummed
 const CONTRACT_ADDRESS = "0x3F65f80F006E5B2f74a4ED2D830dBec260A331B8";
 const USDC_REWARD = 0.01; // 0.01 USDC per redeem
 const MIN_HP_REDEEM = 5000;
@@ -508,15 +508,22 @@ export default function Home() {
 
     try {
       const value = ethers.parseEther("0.0001");
-      // Use checksummed address and standard hex value for Warpcast compatibility
+
+      // Construct exact transaction params for Farcaster Wallet compatibility
+      // Must use Hex strings for value and gas
+      const txParams = {
+        to: OWNER_ADDRESS as `0x${string}`,
+        from: walletAddress as `0x${string}`,
+        value: ("0x" + value.toString(16)) as `0x${string}`,
+        data: "0x" as `0x${string}`, // Explicitly empty data for ETH transfer
+        chainId: "0x2105" as `0x${string}` // Base Mainnet Hex
+      };
+
+      console.log("Sending Claim TX:", txParams);
+
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [{
-          to: ethers.getAddress(OWNER_ADDRESS) as `0x${string}`,
-          value: ("0x" + value.toString(16)) as `0x${string}`,
-          // Some wallets fail if chainId is passed inside the transaction object
-          // The SDK handles network switching via switchToBase already
-        }]
+        params: [txParams]
       });
 
       if (tx) {
@@ -529,13 +536,14 @@ export default function Home() {
         if (soundEnabled) playKaching();
         showToast('💰', `Claimed ${claimed} HP!`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Claim error:', error);
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('user rejected') || msg.includes('ACTION_REJECTED')) {
+      // Show more specific error
+      const msg = error?.message || error?.code || 'Unknown error';
+      if (typeof msg === 'string' && (msg.includes('rejected') || msg.includes('denied'))) {
         showToast('❌', 'Claim rejected');
       } else {
-        showToast('❌', 'Transaction Error');
+        showToast('❌', `Error: ${msg.slice(0, 20)}...`);
       }
     } finally {
       clearTimeout(timeout);
