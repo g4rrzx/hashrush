@@ -20,15 +20,6 @@ const CONTRACT_ABI = [
 
 type Tab = 'mine' | 'store' | 'rank' | 'profile';
 
-const LEADERBOARD = [
-  { rank: 1, name: "whale.eth", score: 128500, avatar: "🐋" },
-  { rank: 2, name: "vitalik.eth", score: 95200, avatar: "💎" },
-  { rank: 3, name: "base.god", score: 78400, avatar: "⚡" },
-  { rank: 4, name: "dwr.eth", score: 52100, avatar: "🎩" },
-  { rank: 5, name: "jessepollak", score: 41800, avatar: "🔵" },
-  { rank: 6, name: "linda_xie", score: 35200, avatar: "✨" },
-];
-
 const SPIN_REWARDS = [
   { label: "+50 HP", value: 50, type: 'points', icon: '⚡', color: '#3b82f6' },
   { label: "+1 Ticket", value: 1, type: 'ticket', icon: '🎫', color: '#f59e0b' },
@@ -965,8 +956,21 @@ export default function Home() {
         {tab === 'rank' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="badges-section"><div className="badges-title">Achievements</div><div className="badges-grid">{BADGES.map(b => (<div key={b.id} className="badge-item"><div className={`badge-icon ${unlockedBadges.includes(b.id) ? 'unlocked' : 'locked'}`}>{b.icon}</div><div className="badge-label">{b.label}</div></div>))}</div></div>
-            <div className="podium">{[LEADERBOARD[1], LEADERBOARD[0], LEADERBOARD[2]].map(u => (<div key={u.rank} className={`podium-item podium-${u.rank}`}><div className="podium-rank">#{u.rank}</div><div className="podium-avatar">{u.avatar}</div><div className="podium-name">{u.name}</div></div>))}</div>
-            <div className="leaderboard-list">{LEADERBOARD.slice(3).map(u => (<div key={u.rank} className="leaderboard-row"><span className="leaderboard-rank">{u.rank}</span><span className="leaderboard-name">{u.name}</span><span className="leaderboard-score">{u.score.toLocaleString()}</span></div>))}<div className="leaderboard-row self"><span className="leaderboard-rank">99</span><span className="leaderboard-name">You</span><span className="leaderboard-score">{totalEarned.toLocaleString()}</span></div></div>
+
+            {/* Your Stats */}
+            <div className="card" style={{ padding: 24, marginTop: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: '3rem', marginBottom: 8 }}>{userTier.icon}</div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 4 }}>{userTier.name} Tier</h2>
+              <div style={{ fontSize: '2rem', fontWeight: 900, color: '#3b82f6', marginBottom: 8 }}>{totalEarned.toLocaleString()} HP</div>
+              <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Keep mining to climb the ranks!</p>
+            </div>
+
+            {/* Leaderboard Coming Soon */}
+            <div className="card" style={{ padding: 24, marginTop: 16, textAlign: 'center', background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)' }}>
+              <Trophy size={40} style={{ margin: '0 auto 12px', color: '#f59e0b' }} />
+              <h3 style={{ fontWeight: 700, marginBottom: 8 }}>Leaderboard Coming Soon</h3>
+              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Season 1 rankings will be revealed weekly!</p>
+            </div>
           </div>
         )}
 
