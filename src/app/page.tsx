@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import sdk, { type Context } from "@farcaster/frame-sdk";
-import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign, RotateCw } from "lucide-react";
+import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign, RotateCw, UserPlus, Copy } from "lucide-react";
 import { ethers } from "ethers";
 
 const OWNER_ADDRESS = "0xe0e8222404bfb2bf10b3a38a758b0cff0336cd5b";
@@ -251,6 +251,36 @@ export default function Home() {
     if (darkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [darkMode]);
+
+  // Handle Referral on Load
+  useEffect(() => {
+    if (isLoading) return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref && !localStorage.getItem('hr_ref_claimed')) {
+      const bonus = 500;
+      setBalance(b => b + bonus);
+      setTotalEarned(t => t + bonus);
+      showToast('🎁', 'Referral Bonus: +500 HP!');
+      localStorage.setItem('hr_ref_claimed', 'true');
+      haptic('heavy');
+      triggerConfetti();
+    }
+  }, [isLoading]);
+
+  const getReferralLink = () => {
+    const fid = context?.user?.fid || '0';
+    const baseUrl = "https://hashrush.vercel.app";
+    const launchUrl = `https://warpcast.com/~/launch-mini-app?name=HashRush&url=${encodeURIComponent(`${baseUrl}?ref=${fid}`)}`;
+    return launchUrl;
+  };
+
+  const copyReferralLink = () => {
+    const link = getReferralLink();
+    navigator.clipboard.writeText(link);
+    showToast('📋', 'Link copied!');
+    haptic('medium');
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1250,8 +1280,38 @@ export default function Home() {
               <span className={`tier-badge ${userTier.class}`}>{userTier.icon} {userTier.name}</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{totalEarned.toLocaleString()}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Total HP</div></div><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{streak}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Streak</div></div><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{unlockedBadges.length}/{BADGES.length}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Badges</div></div></div>
             </div>
-            <button onClick={() => setShowHardware(true)} className="btn-secondary" style={{ marginBottom: 16 }}><Package size={18} /> View Hardware</button>
-            <button onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🚀 Mining on HashRush!\n⚡ ${totalEarned.toLocaleString()} HP\n🏆 ${userTier.name} Tier`)}&embeds[]=https://hashrush.vercel.app`)} className="btn-primary"><Share2 size={18} /> Share</button>
+            <div className="card" style={{ marginTop: 16, padding: 20, textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <div style={{ background: '#eff6ff', padding: 8, borderRadius: 10 }}><UserPlus size={20} className="text-blue-500" /></div>
+                <h3 style={{ fontWeight: 800 }}>Referral System</h3>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 16 }}>Invite friends to earn 500 HP bonus for both of you!</p>
+
+              <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 12, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <code style={{ fontSize: '0.75rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 10 }}>
+                  {getReferralLink().slice(0, 30)}...
+                </code>
+                <button onClick={copyReferralLink} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '6px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Copy size={14} /> Copy
+                </button>
+              </div>
+
+              <button
+                onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🎮 Come play HashRush with me! Mine crypto and earn USDC rewards. 🚀\n\nUse my link for a 500 HP starter bonus!`)}&embeds[]=${encodeURIComponent(getReferralLink())}`)}
+                className="btn-primary"
+                style={{ width: '100%' }}
+              >
+                <Share2 size={18} /> Invite Friends
+              </button>
+            </div>
+
+            <button onClick={() => setShowHardware(true)} className="btn-secondary" style={{ marginTop: 16, marginBottom: 16 }}><Package size={18} /> View Hardware</button>
+            <button
+              onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🚀 Mining on HashRush!\n⚡ ${totalEarned.toLocaleString()} HP\n🏆 ${userTier.name} Tier`)}&embeds[]=${encodeURIComponent(getReferralLink())}`)}
+              className="btn-primary"
+            >
+              <Share2 size={18} /> Share Stats
+            </button>
           </div>
         )}
       </main>
