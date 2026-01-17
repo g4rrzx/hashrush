@@ -405,7 +405,11 @@ export default function Home() {
       const fee = ethers.parseEther("0.0001");
       await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [{ to: OWNER_ADDRESS as `0x${string}`, value: ("0x" + fee.toString(16)) as `0x${string}` }]
+        params: [{
+          to: OWNER_ADDRESS as `0x${string}`,
+          value: ("0x" + fee.toString(16)) as `0x${string}`,
+          chainId: "0x2105" // Base Mainnet (8453)
+        }]
       });
       const claimed = Math.floor(points);
       setBalance(b => b + claimed);
@@ -435,7 +439,11 @@ export default function Home() {
       const cost = ethers.parseEther(item.price);
       await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [{ to: OWNER_ADDRESS as `0x${string}`, value: ("0x" + cost.toString(16)) as `0x${string}` }]
+        params: [{
+          to: OWNER_ADDRESS as `0x${string}`,
+          value: ("0x" + cost.toString(16)) as `0x${string}`,
+          chainId: "0x2105" // Base Mainnet
+        }]
       });
       completeHardwarePurchase(item);
     } catch {
@@ -475,38 +483,61 @@ export default function Home() {
       showToast('❌', `Need ${MIN_HP_REDEEM} HP minimum`);
       return;
     }
+
+    if (!walletConnected) {
+      await connectWallet();
+      return;
+    }
+
+    // Enforce Base Chain
+    if (!isCorrectChain) {
+      await switchToBase();
+      if (!isCorrectChain) {
+        showToast('⚠️', 'Please switch to Base Mainnet');
+        return;
+      }
+    }
+
     haptic('medium');
 
     try {
       // Create contract interface
       const iface = new ethers.Interface(CONTRACT_ABI);
-      const data = iface.encodeFunctionData("redeem", [balance]);
+      const data = iface.encodeFunctionData("redeem", [BigInt(balance)]);
 
       // Call contract
-      await sdk.wallet.ethProvider.request({
+      const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
           to: CONTRACT_ADDRESS as `0x${string}`,
           data: data as `0x${string}`,
-          value: "0x0" as `0x${string}`
+          value: "0x0",
+          chainId: "0x2105" // Base Mainnet
         }]
       });
 
-      // Success
-      setBalance(0);
-      if (soundEnabled) playKaching();
-      haptic('heavy');
-      triggerConfetti();
-      showToast('💵', `Claimed ${USDC_REWARD} USDC!`);
-      setTransactions(prev => [...prev, { type: 'claim', amount: `+${USDC_REWARD} USDC`, time: Date.now() }]);
+      if (tx) {
+        // Success
+        setBalance(0);
+        if (soundEnabled) playKaching();
+        haptic('heavy');
+        triggerConfetti();
+        showToast('💵', `Claimed ${USDC_REWARD} USDC!`);
+        setTransactions(prev => [...prev, { type: 'claim', amount: `+${USDC_REWARD} USDC`, time: Date.now() }]);
+      }
     } catch (error) {
       console.error('Redeem error:', error);
-      if (process.env.NODE_ENV === 'development') {
-        setBalance(0);
-        showToast('💵', `[Dev] Claimed ${USDC_REWARD} USDC!`);
-        triggerConfetti();
+      // Detailed error for user
+      if (error instanceof Error && error.message.includes('user rejected')) {
+        showToast('❌', 'Transaction rejected');
       } else {
-        showToast('❌', 'Redeem failed. Try again!');
+        if (process.env.NODE_ENV === 'development') {
+          setBalance(0);
+          showToast('💵', `[Dev] Claimed ${USDC_REWARD} USDC!`);
+          triggerConfetti();
+        } else {
+          showToast('❌', 'Transaction failed. Check balance.');
+        }
       }
     }
   };
@@ -519,7 +550,11 @@ export default function Home() {
       const fee = ethers.parseEther("0.001");
       await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [{ to: OWNER_ADDRESS as `0x${string}`, value: ("0x" + fee.toString(16)) as `0x${string}` }]
+        params: [{
+          to: OWNER_ADDRESS as `0x${string}`,
+          value: ("0x" + fee.toString(16)) as `0x${string}`,
+          chainId: "0x2105" // Base Mainnet
+        }]
       });
       performSpin();
     } catch {
@@ -924,28 +959,48 @@ export default function Home() {
             ))}
             <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: 16, marginBottom: 10 }}>Redeem ({balance.toLocaleString()} HP)</h3>
 
-            {/* USDC Redeem Card */}
-            <button onClick={handleRedeemUSDC} disabled={balance < MIN_HP_REDEEM} className="card w-full" style={{
-              background: balance >= MIN_HP_REDEEM ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : '#f1f5f9',
-              border: 'none',
-              padding: 20,
-              marginBottom: 12,
-              cursor: balance >= MIN_HP_REDEEM ? 'pointer' : 'not-allowed',
-              color: balance >= MIN_HP_REDEEM ? 'white' : '#94a3b8'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ width: 50, height: 50, background: 'rgba(255,255,255,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <DollarSign size={28} />
+            {/* USDC Redeem Card Centered */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+              <button onClick={handleRedeemUSDC} disabled={balance < MIN_HP_REDEEM} className="card" style={{
+                width: '100%',
+                maxWidth: 320,
+                background: balance >= MIN_HP_REDEEM ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                border: 'none',
+                padding: '24px 20px',
+                borderRadius: 24,
+                cursor: balance >= MIN_HP_REDEEM ? 'pointer' : 'not-allowed',
+                color: balance >= MIN_HP_REDEEM ? 'white' : '#94a3b8',
+                boxShadow: balance >= MIN_HP_REDEEM ? '0 10px 25px -5px rgba(16, 185, 129, 0.4)' : 'none',
+                transition: 'all 0.3s ease',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  width: 60,
+                  height: 60,
+                  background: balance >= MIN_HP_REDEEM ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  <DollarSign size={32} />
                 </div>
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{USDC_REWARD} USDC</div>
-                  <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP</div>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{USDC_REWARD} USDC</h3>
+                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 12 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+
+                <div style={{
+                  background: balance >= MIN_HP_REDEEM ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                  padding: '8px 16px',
+                  borderRadius: 12,
+                  display: 'inline-block',
+                  fontSize: '0.85rem',
+                  fontWeight: 700
+                }}>
+                  {balance >= MIN_HP_REDEEM ? '✨ Ready to Claim' : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700 }}>{balance >= MIN_HP_REDEEM ? '✓ Ready' : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} more`}</div>
-                </div>
-              </div>
-            </button>
+              </button>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button onClick={() => handleRedeem('ticket', 1000)} className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer' }}><Ticket size={24} className="text-yellow-500" style={{ margin: '0 auto 8px' }} /><div style={{ fontWeight: 700 }}>1 Ticket</div><div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>1,000 HP</div></button>
