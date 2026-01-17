@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import sdk, { type Context } from "@farcaster/frame-sdk";
-import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign } from "lucide-react";
+import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign, RotateCw } from "lucide-react";
 import { ethers } from "ethers";
 
 const OWNER_ADDRESS = "0xe0e8222404bfb2bf10b3a38a758b0cff0336cd5b";
@@ -101,7 +101,23 @@ export default function Home() {
   const [streak, setStreak] = useState(1);
   const [streakResetTime, setStreakResetTime] = useState(getStreakResetTime());
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isTransacting, setIsTransacting] = useState(false);
   const [lastMilestone, setLastMilestone] = useState(0);
+  const [leaderboardData, setLeaderboardData] = useState<{ name: string, score: number, tier: string }[]>([]);
+
+  const generateLeaderboard = useCallback(() => {
+    const names = ['vitalik', 'dwr', 'varunsrin', 'shishi', 'v', 'brian', 'jesse', 'coopahtroopa', 'cryptocube', 'basegod'];
+    const data = names.map(n => ({
+      name: n,
+      score: Math.floor(Math.random() * 50000) + 5000,
+      tier: Math.random() > 0.8 ? 'Diamond' : Math.random() > 0.5 ? 'Gold' : 'Silver'
+    })).sort((a, b) => b.score - a.score);
+    setLeaderboardData(data);
+  }, []);
+
+  useEffect(() => {
+    generateLeaderboard();
+  }, [generateLeaderboard]);
   const [jackpotTime, setJackpotTime] = useState(getJackpotTime());
   const [showSpinModal, setShowSpinModal] = useState(false);
   const [spinning, setSpinning] = useState(false);
@@ -399,7 +415,7 @@ export default function Home() {
   };
 
   const handleClaimPoints = async () => {
-    if (points < 1) return;
+    if (points < 1 || isTransacting) return;
 
     if (!walletConnected) {
       await connectWallet();
@@ -414,6 +430,7 @@ export default function Home() {
       }
     }
 
+    setIsTransacting(true);
     haptic('medium');
     try {
       const fee = ethers.parseEther("0.0001");
@@ -451,6 +468,8 @@ export default function Home() {
       } else {
         showToast('❌', 'Claim failed');
       }
+    } finally {
+      setIsTransacting(false);
     }
   };
 
@@ -468,6 +487,7 @@ export default function Home() {
       }
     }
 
+    setIsTransacting(true);
     haptic('medium');
     try {
       const cost = ethers.parseEther(item.price);
@@ -491,6 +511,8 @@ export default function Home() {
       } else {
         showToast('❌', 'Purchase failed');
       }
+    } finally {
+      setIsTransacting(false);
     }
   };
 
@@ -520,7 +542,7 @@ export default function Home() {
 
   // Redeem USDC from smart contract
   const handleRedeemUSDC = async () => {
-    if (balance < MIN_HP_REDEEM) {
+    if (balance < MIN_HP_REDEEM || isTransacting) {
       showToast('❌', `Need ${MIN_HP_REDEEM} HP minimum`);
       return;
     }
@@ -539,6 +561,7 @@ export default function Home() {
       }
     }
 
+    setIsTransacting(true);
     haptic('medium');
 
     try {
@@ -580,11 +603,13 @@ export default function Home() {
           showToast('❌', 'Transaction failed. Check balance.');
         }
       }
+    } finally {
+      setIsTransacting(false);
     }
   };
 
   const handleSpin = async () => {
-    if (spinning) return;
+    if (spinning || isTransacting) return;
 
     if (!walletConnected) {
       await connectWallet();
@@ -599,6 +624,7 @@ export default function Home() {
       }
     }
 
+    setIsTransacting(true);
     haptic('medium');
     setShowSpinModal(true);
     try {
@@ -625,6 +651,8 @@ export default function Home() {
         showToast('❌', 'Spin failed');
         setShowSpinModal(false);
       }
+    } finally {
+      setIsTransacting(false);
     }
   };
 
@@ -669,6 +697,17 @@ export default function Home() {
   return (
     <>
       <div className="app-bg" />
+
+      {/* Global Loading Overlay */}
+      {isTransacting && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 flex flex-col items-center gap-4 shadow-2xl scale-in">
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="text-lg font-bold dark:text-white">Transaction Pending...</div>
+            <div className="text-sm text-slate-500 text-center">Check your wallet popup</div>
+          </div>
+        </div>
+      )}
 
       {/* Confetti */}
       {showConfetti && (
@@ -1138,22 +1177,66 @@ export default function Home() {
         )}
 
         {tab === 'rank' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="badges-section"><div className="badges-title">Achievements</div><div className="badges-grid">{BADGES.map(b => (<div key={b.id} className="badge-item"><div className={`badge-icon ${unlockedBadges.includes(b.id) ? 'unlocked' : 'locked'}`}>{b.icon}</div><div className="badge-label">{b.label}</div></div>))}</div></div>
-
-            {/* Your Stats */}
-            <div className="card" style={{ padding: 24, marginTop: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', marginBottom: 8 }}>{userTier.icon}</div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 4 }}>{userTier.name} Tier</h2>
-              <div style={{ fontSize: '2rem', fontWeight: 900, color: '#3b82f6', marginBottom: 8 }}>{totalEarned.toLocaleString()} HP</div>
-              <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Keep mining to climb the ranks!</p>
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+            <div className="badges-section">
+              <div className="badges-title">Achievements</div>
+              <div className="badges-grid">
+                {BADGES.map(b => (
+                  <div key={b.id} className="badge-item">
+                    <div className={`badge-icon ${unlockedBadges.includes(b.id) ? 'unlocked' : 'locked'}`}>{b.icon}</div>
+                    <div className="badge-label">{b.label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Leaderboard Coming Soon */}
-            <div className="card" style={{ padding: 24, marginTop: 16, textAlign: 'center', background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)' }}>
-              <Trophy size={40} style={{ margin: '0 auto 12px', color: '#f59e0b' }} />
-              <h3 style={{ fontWeight: 700, marginBottom: 8 }}>Leaderboard Coming Soon</h3>
-              <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Season 1 rankings will be revealed weekly!</p>
+            {/* Your Stats */}
+            <div className="card" style={{ padding: 24, marginTop: 16, textAlign: 'center', background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)' }}>
+              <div style={{ fontSize: '3.5rem', marginBottom: 8 }}>{userTier.icon}</div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 4 }}>{userTier.name} Tier</h2>
+              <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#2563eb', marginBottom: 8 }}>{totalEarned.toLocaleString()} <span style={{ fontSize: '1rem', color: '#94a3b8' }}>HP</span></div>
+              <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Next Tier at {(userTier.name === 'Bronze' ? 1000 : userTier.name === 'Silver' ? 10000 : 50000).toLocaleString()} HP</p>
+            </div>
+
+            <div className="flex justify-between items-center mt-8 mb-4">
+              <h3 className="text-lg font-black dark:text-white">Leaderboard</h3>
+              <button
+                onClick={() => { haptic('medium'); generateLeaderboard(); showToast('🔄', 'Ranking refreshed!'); }}
+                className="text-blue-500 text-sm font-bold flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-full"
+              >
+                <RotateCw size={14} /> Refresh
+              </button>
+            </div>
+
+            <div className="leaderboard-list">
+              {leaderboardData.map((user, i) => (
+                <div key={i} className="leaderboard-row">
+                  <div className="leaderboard-rank">{i + 1}</div>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm">
+                      {user.name[0].toUpperCase()}
+                    </div>
+                    <div className="leaderboard-name">@{user.name}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="leaderboard-score">{user.score.toLocaleString()} HP</div>
+                    <div className="text-[10px] opacity-60 font-bold uppercase">{user.tier}</div>
+                  </div>
+                </div>
+              ))}
+              <div className="leaderboard-row self">
+                <div className="leaderboard-rank">-</div>
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm">
+                    {context?.user?.displayName?.[0].toUpperCase() || 'U'}
+                  </div>
+                  <div className="leaderboard-name">@{context?.user?.username || 'you'} (You)</div>
+                </div>
+                <div className="text-right">
+                  <div className="leaderboard-score">{totalEarned.toLocaleString()} HP</div>
+                  <div className="text-[10px] opacity-60 font-bold uppercase">{userTier.name}</div>
+                </div>
+              </div>
             </div>
           </div>
         )}
