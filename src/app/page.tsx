@@ -1,0 +1,822 @@
+"use client";
+
+import { useEffect, useState, useRef, useCallback } from "react";
+import sdk, { type Context } from "@farcaster/frame-sdk";
+import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign } from "lucide-react";
+import { ethers } from "ethers";
+
+const OWNER_ADDRESS = "0x7D400FD1F5927f0fd544ad2068b353b63b15cdf9";
+const CONTRACT_ADDRESS = "0x3F65f80F006E5B2f74a4ED2D830dBec260A331B8";
+const USDC_REWARD = 0.01; // 0.01 USDC per redeem
+const MIN_HP_REDEEM = 5000;
+
+const CONTRACT_ABI = [
+  "function redeem(uint256 hpAmount) external",
+  "function canRedeem(address user) external view returns (bool, string memory)",
+  "function getRemainingCooldown(address user) external view returns (uint256)",
+  "function getPoolBalance() external view returns (uint256)",
+  "function rewardAmount() external view returns (uint256)"
+];
+
+type Tab = 'mine' | 'store' | 'rank' | 'profile';
+
+const LEADERBOARD = [
+  { rank: 1, name: "whale.eth", score: 128500, avatar: "🐋" },
+  { rank: 2, name: "vitalik.eth", score: 95200, avatar: "💎" },
+  { rank: 3, name: "base.god", score: 78400, avatar: "⚡" },
+  { rank: 4, name: "dwr.eth", score: 52100, avatar: "🎩" },
+  { rank: 5, name: "jessepollak", score: 41800, avatar: "🔵" },
+  { rank: 6, name: "linda_xie", score: 35200, avatar: "✨" },
+];
+
+const SPIN_REWARDS = [
+  { label: "+50 HP", value: 50, type: 'points', icon: '⚡', color: '#3b82f6' },
+  { label: "+1 Ticket", value: 1, type: 'ticket', icon: '🎫', color: '#f59e0b' },
+  { label: "+100 HP", value: 100, type: 'points', icon: '⚡', color: '#8b5cf6' },
+  { label: "+10 MH/s", value: 10, type: 'boost', icon: '🚀', color: '#22c55e' },
+  { label: "+200 HP", value: 200, type: 'points', icon: '⚡', color: '#06b6d4' },
+  { label: "+2 Tickets", value: 2, type: 'ticket', icon: '🎫', color: '#ec4899' },
+  { label: "+500 HP", value: 500, type: 'points', icon: '💎', color: '#6366f1' },
+  { label: "+50 MH/s", value: 50, type: 'boost', icon: '🔥', color: '#ef4444' },
+];
+
+const BADGES = [
+  { id: 'first1k', icon: '🏅', label: 'First 1K HP', check: (p: number) => p >= 1000 },
+  { id: 'streak7', icon: '🔥', label: '7-Day Streak', check: (_: number, s: number) => s >= 7 },
+  { id: 'top50', icon: '🏆', label: 'Top 50', check: () => false },
+  { id: 'whale', icon: '🐋', label: '10K Club', check: (p: number) => p >= 10000 },
+  { id: 'tapper', icon: '👆', label: 'Tap Master', check: () => false },
+];
+
+const HARDWARE_ITEMS = [
+  { id: 'starter', name: 'Starter GPU', boost: 10, price: '0.0005', icon: '💻' },
+  { id: 'turbo', name: 'Turbo Rig', boost: 50, price: '0.001', icon: '⚡' },
+  { id: 'farm', name: 'Mining Farm', boost: 200, price: '0.003', icon: '🏭' },
+  { id: 'quantum', name: 'Quantum Core', boost: 500, price: '0.005', icon: '🔮' },
+];
+
+const getTier = (hp: number) => {
+  if (hp >= 50000) return { name: 'Diamond', icon: '💎', class: 'tier-diamond' };
+  if (hp >= 10000) return { name: 'Gold', icon: '🥇', class: 'tier-gold' };
+  if (hp >= 1000) return { name: 'Silver', icon: '🥈', class: 'tier-silver' };
+  return { name: 'Bronze', icon: '🥉', class: 'tier-bronze' };
+};
+
+const playKaching = () => {
+  try {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhXWx9jJy2romZqZF0dH2TpqqhiHB2hZenrqKPgn55f4qWoJmLfXh8hZGak5CDe3p8g42VkIV8dnJ1fYiSkIqAd3J0e4WQko6GfnZzeH+Ij5CLhX54dHZ9hoyOi4V+eXZ3fIOJjImFf3t4d3uBhoqIhYF8eXd5fYSHh4WBfXp4eX2BhYaFgn57eXl7f4ODg4F+e3l5e36BgoKBf3x6eXp8f4GBgH98e3l5e36AgIB/fXt6enx+f4CAfn17enp7fX5/f358e3p6e31+fn5+fHt6ent8fX5+fXx7enp7fH1+fnx8e3p6e3x9fX18fHt6ent8fX19fHx7enp7fHx9fXx8e3p6e3x8fHx8e3t6ent8fHx8fHt7enp7fHx8fHx7e3p6e3t8fHx8e3t6enp7e3x8fHt7e3p6e3t7fHx8e3t7enp7e3t8e3t7e3p6e3t7e3t7e3t7enp7e3t7e3t7e3t6ent7e3t7e3t7e3p6e3t7e3t7');
+    audio.volume = 0.3;
+    audio.play().catch(() => { });
+  } catch { }
+};
+
+const getJackpotTime = () => {
+  const now = new Date();
+  const nextSunday = new Date(now);
+  nextSunday.setUTCDate(now.getUTCDate() + (7 - now.getUTCDay()) % 7);
+  nextSunday.setUTCHours(20, 0, 0, 0);
+  if (nextSunday <= now) nextSunday.setUTCDate(nextSunday.getUTCDate() + 7);
+  return nextSunday.getTime() - now.getTime();
+};
+
+const getStreakResetTime = () => {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setHours(24, 0, 0, 0);
+  return tomorrow.getTime() - now.getTime();
+};
+
+type Transaction = { type: 'claim' | 'buy' | 'spin' | 'game'; amount: string; time: number };
+type OwnedHardware = { id: string; count: number; totalBoost: number };
+
+export default function Home() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [points, setPoints] = useState(0);
+  const [balance, setBalance] = useState(0);
+  const [totalEarned, setTotalEarned] = useState(0);
+  const [mining, setMining] = useState(true);
+  const [context, setContext] = useState<Context.MiniAppContext>();
+  const [inventory, setInventory] = useState({ tickets: 0, tokens: 0, rigs: 1, spins: 0 });
+  const [ownedHardware, setOwnedHardware] = useState<OwnedHardware[]>([{ id: 'starter', count: 1, totalBoost: 10 }]);
+  const [hashRate, setHashRate] = useState(10);
+  const [tab, setTab] = useState<Tab>('mine');
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [offlineGain, setOfflineGain] = useState(0);
+  const [streak, setStreak] = useState(1);
+  const [streakResetTime, setStreakResetTime] = useState(getStreakResetTime());
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [lastMilestone, setLastMilestone] = useState(0);
+  const [jackpotTime, setJackpotTime] = useState(getJackpotTime());
+  const [showSpinModal, setShowSpinModal] = useState(false);
+  const [spinning, setSpinning] = useState(false);
+  const [spinResult, setSpinResult] = useState<typeof SPIN_REWARDS[0] | null>(null);
+  const [unlockedBadges, setUnlockedBadges] = useState<string[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationToken, setNotificationToken] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [toast, setToast] = useState<{ icon: string; text: string } | null>(null);
+  const [showHardware, setShowHardware] = useState(false);
+
+  const [showTapGame, setShowTapGame] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const [tapTimeLeft, setTapTimeLeft] = useState(10);
+  const [tapGameActive, setTapGameActive] = useState(false);
+  const [lastTapGameDate, setLastTapGameDate] = useState<string | null>(null);
+  const [canPlayTapGame, setCanPlayTapGame] = useState(true);
+
+  const pointsRef = useRef(points);
+  const prevBadgesRef = useRef<string[]>([]);
+
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 3000);
+  };
+
+  const showToast = (icon: string, text: string) => {
+    setToast({ icon, text });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const haptic = useCallback((type: 'light' | 'medium' | 'heavy') => {
+    try { sdk.haptics.impactOccurred(type); } catch { }
+  }, []);
+
+  useEffect(() => {
+    if (darkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [darkMode]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setJackpotTime(getJackpotTime());
+      setStreakResetTime(getStreakResetTime());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCountdown = (ms: number) => {
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    return { days, hours, mins };
+  };
+
+  const formatStreakReset = (ms: number) => {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${mins}m`;
+  };
+
+  // Check badges
+  useEffect(() => {
+    const newBadges = BADGES.filter(b => b.check(totalEarned, streak)).map(b => b.id);
+    const allBadges = [...new Set([...unlockedBadges, ...newBadges])];
+
+    // Check for newly unlocked badges
+    const justUnlocked = allBadges.filter(b => !prevBadgesRef.current.includes(b));
+    if (justUnlocked.length > 0 && prevBadgesRef.current.length > 0) {
+      const badge = BADGES.find(b => b.id === justUnlocked[0]);
+      if (badge) {
+        showToast(badge.icon, `${badge.label} Unlocked!`);
+        triggerConfetti();
+        haptic('heavy');
+      }
+    }
+
+    prevBadgesRef.current = allBadges;
+    setUnlockedBadges(allBadges);
+  }, [totalEarned, streak, haptic]);
+
+  useEffect(() => {
+    const milestone = Math.floor(points / 100) * 100;
+    if (milestone > lastMilestone && soundEnabled && milestone > 0) {
+      playKaching();
+      setLastMilestone(milestone);
+    }
+  }, [points, lastMilestone, soundEnabled]);
+
+  useEffect(() => {
+    const init = async () => {
+      const ctx = await sdk.context;
+      setContext(ctx);
+      sdk.actions.ready();
+    };
+    if (sdk && !context) init();
+
+    setTimeout(() => {
+      const saved = localStorage.getItem('hr_v12');
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          const elapsed = (Date.now() - data.time) / 1000;
+          const gain = (data.hashRate / 1000) * Math.min(elapsed, 86400);
+
+          const lastDate = new Date(data.time).toDateString();
+          const today = new Date().toDateString();
+          const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+          if (lastDate === today) setStreak(data.streak || 1);
+          else if (lastDate === yesterday) setStreak((data.streak || 0) + 1);
+          else setStreak(1);
+
+          if (data.lastTapGameDate === today) {
+            setCanPlayTapGame(false);
+            setLastTapGameDate(data.lastTapGameDate);
+          }
+
+          if (gain > 50) { setOfflineGain(gain); setShowWelcome(true); }
+
+          setPoints(data.points + gain);
+          pointsRef.current = data.points + gain;
+          setBalance(data.balance || 0);
+          setTotalEarned(data.totalEarned || 0);
+          setLastMilestone(Math.floor((data.points + gain) / 100) * 100);
+          setInventory(data.inventory || { tickets: 0, tokens: 0, rigs: 1, spins: 0 });
+          setOwnedHardware(data.ownedHardware || [{ id: 'starter', count: 1, totalBoost: 10 }]);
+          setHashRate(data.hashRate || 10);
+          setUnlockedBadges(data.badges || []);
+          prevBadgesRef.current = data.badges || [];
+          setTransactions(data.transactions || []);
+          setDarkMode(data.darkMode || false);
+          setSoundEnabled(data.soundEnabled !== false);
+          setNotificationsEnabled(data.notificationsEnabled || false);
+        } catch (e) { console.error(e); }
+      } else {
+        setShowOnboarding(true);
+      }
+      setIsLoading(false);
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+    const save = () => {
+      localStorage.setItem('hr_v12', JSON.stringify({
+        points: pointsRef.current, balance, totalEarned, inventory, ownedHardware, hashRate, streak,
+        badges: unlockedBadges, lastTapGameDate, transactions: transactions.slice(-20),
+        darkMode, soundEnabled, notificationsEnabled, time: Date.now()
+      }));
+    };
+    const interval = setInterval(save, 5000);
+    document.addEventListener('visibilitychange', () => document.hidden && save());
+    return () => clearInterval(interval);
+  }, [isLoading, balance, totalEarned, inventory, ownedHardware, hashRate, streak, unlockedBadges, lastTapGameDate, transactions, darkMode, soundEnabled, notificationsEnabled]);
+
+  useEffect(() => {
+    if (!mining || isLoading) return;
+    const streakMultiplier = streak >= 7 ? 1.5 : 1;
+    const interval = setInterval(() => {
+      const inc = (hashRate / 1000) * (0.9 + Math.random() * 0.2) * streakMultiplier;
+      setPoints(p => { pointsRef.current = p + inc; return p + inc; });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [mining, hashRate, streak, isLoading]);
+
+  useEffect(() => {
+    if (!tapGameActive || tapTimeLeft <= 0) return;
+    const timer = setTimeout(() => setTapTimeLeft(t => t - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [tapGameActive, tapTimeLeft]);
+
+  useEffect(() => {
+    if (tapGameActive && tapTimeLeft === 0) {
+      setTapGameActive(false);
+      const reward = Math.floor(tapCount * 0.5);
+      setBalance(b => b + reward);
+      setTotalEarned(t => t + reward);
+      if (soundEnabled) playKaching();
+      setLastTapGameDate(new Date().toDateString());
+      setCanPlayTapGame(false);
+      setTransactions(prev => [...prev, { type: 'game', amount: `+${reward} HP`, time: Date.now() }]);
+      if (tapCount >= 50 && !unlockedBadges.includes('tapper')) setUnlockedBadges(prev => [...prev, 'tapper']);
+      haptic('heavy');
+      triggerConfetti();
+      setShowTapGame(false);
+    }
+  }, [tapTimeLeft, tapGameActive, tapCount, soundEnabled, unlockedBadges, haptic]);
+
+  const enableNotifications = async () => {
+    haptic('medium');
+    try {
+      const result = await sdk.actions.addFrame();
+      if (result) {
+        setNotificationsEnabled(true);
+        showToast('🔔', 'Notifications enabled!');
+      }
+    } catch {
+      if (process.env.NODE_ENV === 'development') setNotificationsEnabled(true);
+    }
+  };
+
+  const handleClaimPoints = async () => {
+    if (points < 1) return;
+    haptic('medium');
+    try {
+      const fee = ethers.parseEther("0.0001");
+      await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{ to: OWNER_ADDRESS as `0x${string}`, value: ("0x" + fee.toString(16)) as `0x${string}` }]
+      });
+      const claimed = Math.floor(points);
+      setBalance(b => b + claimed);
+      setTotalEarned(t => t + claimed);
+      setPoints(0);
+      pointsRef.current = 0;
+      setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
+      if (soundEnabled) playKaching();
+      showToast('💰', `Claimed ${claimed} HP!`);
+    } catch {
+      if (process.env.NODE_ENV === 'development') {
+        const claimed = Math.floor(points);
+        setBalance(b => b + claimed);
+        setTotalEarned(t => t + claimed);
+        setPoints(0);
+        pointsRef.current = 0;
+        setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
+        showToast('💰', `Claimed ${claimed} HP!`);
+      }
+    }
+  };
+
+  const handleBuy = async (item: typeof HARDWARE_ITEMS[0]) => {
+    haptic('medium');
+    if (soundEnabled) playKaching();
+    try {
+      const cost = ethers.parseEther(item.price);
+      await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{ to: OWNER_ADDRESS as `0x${string}`, value: ("0x" + cost.toString(16)) as `0x${string}` }]
+      });
+      completeHardwarePurchase(item);
+    } catch {
+      if (process.env.NODE_ENV === 'development' && confirm(`Dev: Buy ${item.name}?`)) {
+        completeHardwarePurchase(item);
+      }
+    }
+  };
+
+  const completeHardwarePurchase = (item: typeof HARDWARE_ITEMS[0]) => {
+    setHashRate(h => h + item.boost);
+    setInventory(i => ({ ...i, rigs: i.rigs + 1 }));
+    setOwnedHardware(prev => {
+      const existing = prev.find(h => h.id === item.id);
+      if (existing) {
+        return prev.map(h => h.id === item.id ? { ...h, count: h.count + 1, totalBoost: h.totalBoost + item.boost } : h);
+      }
+      return [...prev, { id: item.id, count: 1, totalBoost: item.boost }];
+    });
+    setTransactions(prev => [...prev, { type: 'buy', amount: `+${item.boost} MH/s`, time: Date.now() }]);
+    showToast(item.icon, `${item.name} installed!`);
+    haptic('heavy');
+  };
+
+  const handleRedeem = (type: 'ticket' | 'token', cost: number) => {
+    if (balance < cost) return;
+    haptic('light');
+    if (soundEnabled) playKaching();
+    setBalance(b => b - cost);
+    if (type === 'ticket') setInventory(i => ({ ...i, tickets: i.tickets + 1 }));
+    else setInventory(i => ({ ...i, tokens: i.tokens + 1 }));
+  };
+
+  // Redeem USDC from smart contract
+  const handleRedeemUSDC = async () => {
+    if (balance < MIN_HP_REDEEM) {
+      showToast('❌', `Need ${MIN_HP_REDEEM} HP minimum`);
+      return;
+    }
+    haptic('medium');
+
+    try {
+      // Create contract interface
+      const iface = new ethers.Interface(CONTRACT_ABI);
+      const data = iface.encodeFunctionData("redeem", [balance]);
+
+      // Call contract
+      await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          to: CONTRACT_ADDRESS as `0x${string}`,
+          data: data as `0x${string}`,
+          value: "0x0" as `0x${string}`
+        }]
+      });
+
+      // Success
+      setBalance(0);
+      if (soundEnabled) playKaching();
+      haptic('heavy');
+      triggerConfetti();
+      showToast('💵', `Claimed ${USDC_REWARD} USDC!`);
+      setTransactions(prev => [...prev, { type: 'claim', amount: `+${USDC_REWARD} USDC`, time: Date.now() }]);
+    } catch (error) {
+      console.error('Redeem error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        setBalance(0);
+        showToast('💵', `[Dev] Claimed ${USDC_REWARD} USDC!`);
+        triggerConfetti();
+      } else {
+        showToast('❌', 'Redeem failed. Try again!');
+      }
+    }
+  };
+
+  const handleSpin = async () => {
+    if (spinning) return;
+    haptic('medium');
+    setShowSpinModal(true);
+    try {
+      const fee = ethers.parseEther("0.001");
+      await sdk.wallet.ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [{ to: OWNER_ADDRESS as `0x${string}`, value: ("0x" + fee.toString(16)) as `0x${string}` }]
+      });
+      performSpin();
+    } catch {
+      if (process.env.NODE_ENV === 'development') performSpin();
+      else setShowSpinModal(false);
+    }
+  };
+
+  const performSpin = () => {
+    setSpinning(true);
+    setSpinResult(null);
+    setTimeout(() => {
+      const reward = SPIN_REWARDS[Math.floor(Math.random() * SPIN_REWARDS.length)];
+      if (reward.type === 'points') { setBalance(b => b + reward.value); setTotalEarned(t => t + reward.value); }
+      else if (reward.type === 'ticket') setInventory(i => ({ ...i, tickets: i.tickets + reward.value }));
+      else if (reward.type === 'boost') setHashRate(h => h + reward.value);
+      setSpinResult(reward);
+      setTransactions(prev => [...prev, { type: 'spin', amount: reward.label, time: Date.now() }]);
+      setInventory(i => ({ ...i, spins: i.spins + 1 }));
+      if (soundEnabled) playKaching();
+      haptic('heavy');
+      triggerConfetti();
+      setSpinning(false);
+    }, 4000);
+  };
+
+  const countdown = formatCountdown(jackpotTime);
+  const userTier = getTier(totalEarned);
+
+  if (isLoading) {
+    return (
+      <>
+        <div className="app-bg" />
+        <main className="container">
+          <div className="skeleton-card" style={{ marginBottom: 16 }}>
+            <div className="flex items-center gap-3">
+              <div className="skeleton skeleton-circle" style={{ width: 42, height: 42 }} />
+              <div style={{ flex: 1 }}><div className="skeleton skeleton-text" style={{ width: '40%' }} /></div>
+            </div>
+          </div>
+          <div className="skeleton-card" style={{ padding: 40 }} />
+        </main>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="app-bg" />
+
+      {/* Confetti */}
+      {showConfetti && (
+        <div className="confetti-container">
+          {[...Array(50)].map((_, i) => (
+            <div key={i} className="confetti" style={{
+              left: `${Math.random() * 100}%`,
+              background: ['#f59e0b', '#3b82f6', '#22c55e', '#ec4899', '#8b5cf6'][i % 5],
+              animationDelay: `${Math.random() * 0.5}s`,
+              borderRadius: i % 2 ? '50%' : '0'
+            }} />
+          ))}
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="toast">
+          <span style={{ fontSize: '1.5rem' }}>{toast.icon}</span>
+          <span style={{ fontWeight: 600 }}>{toast.text}</span>
+        </div>
+      )}
+
+      {/* Spin Modal */}
+      {showSpinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
+            <h2 className="text-xl font-bold mb-4">🎰 Lucky Spin</h2>
+            <div style={{ position: 'relative', width: 240, height: 240, margin: '0 auto 20px' }}>
+              <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', fontSize: '1.75rem', zIndex: 10 }}>▼</div>
+              <div className={`spin-modal-wheel ${spinning ? 'spinning' : ''}`} style={{ width: '100%', height: '100%', borderRadius: '50%', position: 'relative', overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.25), inset 0 0 0 6px white', transition: 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' }}>
+                {SPIN_REWARDS.map((reward, i) => (
+                  <div key={i} className="wheel-segment" style={{ transform: `rotate(${i * 45}deg)`, background: reward.color }}>
+                    <div className="wheel-segment-content">
+                      <span className="wheel-segment-icon">{reward.icon}</span>
+                      <span className="wheel-segment-label">{reward.label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 50, height: 50, background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 5 }}>🎯</div>
+            </div>
+            {spinResult ? (
+              <div className="spin-result-card">
+                <div className="spin-result-icon">{spinResult.icon}</div>
+                <div className="spin-result-label" style={{ color: spinResult.color }}>{spinResult.label}</div>
+                <div className="spin-result-desc">
+                  {spinResult.type === 'points' && 'Added to your balance!'}
+                  {spinResult.type === 'ticket' && 'Lottery ticket added!'}
+                  {spinResult.type === 'boost' && 'Mining speed boosted!'}
+                </div>
+                <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => setShowSpinModal(false)}>Awesome!</button>
+              </div>
+            ) : (
+              <p className="text-gray-500" style={{ marginTop: 8 }}>🎲 Spinning the wheel...</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Hardware Collection */}
+      {showHardware && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl max-h-[80vh] overflow-auto">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 48, height: 48, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🖥️</div>
+                <div>
+                  <h2 style={{ fontWeight: 800, fontSize: '1.1rem' }}>My Hardware</h2>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{inventory.rigs} rigs active</p>
+                </div>
+              </div>
+              <button onClick={() => setShowHardware(false)} style={{ width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+            </div>
+            <div className="hardware-total-stats">
+              <div className="hardware-total-stat">
+                <div className="hardware-total-value">{hashRate}</div>
+                <div className="hardware-total-label">MH/s Total</div>
+              </div>
+              <div className="hardware-total-stat">
+                <div className="hardware-total-value">{inventory.rigs}</div>
+                <div className="hardware-total-label">Rigs Owned</div>
+              </div>
+            </div>
+            <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 12 }}>Your Rigs</h3>
+            {ownedHardware.map(hw => {
+              const item = HARDWARE_ITEMS.find(h => h.id === hw.id);
+              if (!item) return null;
+              return (
+                <div key={hw.id} className="hardware-card">
+                  <div className="hardware-icon">{item.icon}</div>
+                  <div className="hardware-info">
+                    <div className="hardware-name">{item.name}</div>
+                    <div className="hardware-stats">
+                      <span className="hardware-stat count">×{hw.count}</span>
+                      <span className="hardware-stat">+{hw.totalBoost} MH/s</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {ownedHardware.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#94a3b8', padding: 20 }}>No hardware yet. Visit Shop!</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Settings / Welcome / TapGame modals... (same as before, abbreviated) */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="text-gray-400 text-xl">✕</button>
+            </div>
+            <div className="settings-item">
+              <div className="settings-label">
+                <div className="settings-icon" style={{ background: darkMode ? '#312e81' : '#fef3c7' }}>
+                  {darkMode ? <Moon size={20} className="text-indigo-400" /> : <Sun size={20} className="text-yellow-500" />}
+                </div>
+                <div><div style={{ fontWeight: 600 }}>Dark Mode</div></div>
+              </div>
+              <div className={`toggle-switch ${darkMode ? 'active' : ''}`} onClick={() => setDarkMode(!darkMode)} />
+            </div>
+            <div className="settings-item">
+              <div className="settings-label">
+                <div className="settings-icon" style={{ background: '#dcfce7' }}><Sparkles size={20} className="text-green-500" /></div>
+                <div><div style={{ fontWeight: 600 }}>Sound Effects</div></div>
+              </div>
+              <div className={`toggle-switch ${soundEnabled ? 'active' : ''}`} onClick={() => setSoundEnabled(!soundEnabled)} />
+            </div>
+            <div className="settings-item">
+              <div className="settings-label">
+                <div className="settings-icon" style={{ background: notificationsEnabled ? '#dbeafe' : '#f1f5f9' }}>
+                  {notificationsEnabled ? <Bell size={20} className="text-blue-500" /> : <BellOff size={20} className="text-gray-400" />}
+                </div>
+                <div><div style={{ fontWeight: 600 }}>Notifications</div></div>
+              </div>
+              <div className={`toggle-switch ${notificationsEnabled ? 'active' : ''}`} onClick={notificationsEnabled ? () => setNotificationsEnabled(false) : enableNotifications} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWelcome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center"><Zap size={40} className="text-white" /></div>
+            <h2 className="text-2xl font-bold mb-2">Welcome Back!</h2>
+            <div className="bg-blue-50 rounded-2xl p-6 mb-6"><div className="text-4xl font-black text-blue-600">+{offlineGain.toFixed(0)}</div><div className="text-sm text-blue-500">Offline HP</div></div>
+            <button onClick={() => { haptic('medium'); if (soundEnabled) playKaching(); setShowWelcome(false); }} className="btn-primary">Collect</button>
+          </div>
+        </div>
+      )}
+
+      {showTapGame && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div className="text-4xl mb-2">👆</div>
+            <h2 className="text-xl font-bold mb-2">Tap Rush!</h2>
+            <div className="bg-gray-100 rounded-2xl p-4 mb-4"><div className="text-5xl font-black text-blue-600">{tapCount}</div></div>
+            <div className="text-2xl font-bold text-red-500 mb-4">{tapTimeLeft}s</div>
+            {tapGameActive ? (
+              <button onClick={() => { haptic('light'); setTapCount(c => c + 1); }} className="w-full py-8 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-xl active:scale-95 shadow-xl">TAP!</button>
+            ) : (
+              <button onClick={() => setShowTapGame(false)} className="btn-primary">Close</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showOnboarding && (
+        <div className="onboarding-overlay">
+          <div className="onboarding-tooltip" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+            <h3>{['Welcome to HashRush! 🎉', 'Claim Your Points 💰', 'Daily Tap Game 🎮', 'Stay Notified 🔔'][onboardingStep]}</h3>
+            <p style={{ marginBottom: 16 }}>{['Watch your HP grow automatically!', 'Move earned HP to your balance.', 'Play daily for bonus HP!', 'Get jackpot & streak alerts!'][onboardingStep]}</p>
+            <button className="onboarding-btn onboarding-btn-primary" onClick={() => onboardingStep < 3 ? setOnboardingStep(s => s + 1) : setShowOnboarding(false)}>{onboardingStep < 3 ? 'Next' : 'Start!'}</button>
+          </div>
+        </div>
+      )}
+
+      <main className="container">
+        <div className="header">
+          <div className="header-brand">
+            <div className="header-logo"><Zap size={20} className="text-white" /></div>
+            <div className="header-info"><h1>HashRush</h1><span>Season 1</span></div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => setShowSettings(true)} className="settings-btn"><Settings size={16} /></button>
+            <span className={`tier-badge ${userTier.class}`}>{userTier.icon} {userTier.name}</span>
+          </div>
+        </div>
+
+        {tab === 'mine' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="jackpot-timer">
+              <div className="jackpot-left"><h4><Gift size={14} /> Jackpot</h4><p>1 ETH Prize</p></div>
+              <div className="jackpot-countdown">
+                <div className="jackpot-time-box"><span className="jackpot-time-value">{countdown.days}</span><span className="jackpot-time-label">D</span></div>
+                <div className="jackpot-time-box"><span className="jackpot-time-value">{countdown.hours}</span><span className="jackpot-time-label">H</span></div>
+                <div className="jackpot-time-box"><span className="jackpot-time-value">{countdown.mins}</span><span className="jackpot-time-label">M</span></div>
+              </div>
+            </div>
+
+            {streak >= 2 && (
+              <div className="streak-banner">
+                <span className="streak-icon">🔥</span>
+                <div className="streak-info">
+                  <h4>{streak >= 7 ? '50% Bonus!' : `${streak}d Streak`}</h4>
+                  <div className="streak-countdown">⏱️ Reset in {formatStreakReset(streakResetTime)}</div>
+                </div>
+                <span className="streak-days">{streak}d</span>
+              </div>
+            )}
+
+            {!notificationsEnabled && (
+              <button onClick={enableNotifications} className="notif-cta">
+                <div className="notif-cta-icon"><Bell size={20} className="text-white" /><span className="notif-cta-pulse" /></div>
+                <div className="notif-cta-text"><strong>Enable Notifications</strong><span>Get jackpot & streak alerts</span></div>
+                <div className="notif-cta-arrow">→</div>
+              </button>
+            )}
+
+            <div className="hash-display">
+              <div className="hash-label">Unclaimed Hash Power</div>
+              <div className="hash-value">{points.toFixed(2)}</div>
+              <div className="hash-unit">HP</div>
+              <div className="stats-row">
+                <div className="stat-pill" onClick={() => setShowHardware(true)} style={{ cursor: 'pointer' }}><Zap size={12} className="text-yellow-500" /><span className="stat-pill-value">{hashRate} MH/s</span></div>
+                <div className="stat-pill" onClick={() => setShowHardware(true)} style={{ cursor: 'pointer' }}><Cpu size={12} className="text-purple-500" /><span className="stat-pill-value">{inventory.rigs} Rigs</span></div>
+              </div>
+            </div>
+
+            <div className="action-grid">
+              <button onClick={handleClaimPoints} className="action-btn" style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #93c5fd' }}>
+                <div className="action-btn-icon" style={{ background: '#3b82f6' }}><ArrowDownToLine size={22} className="text-white" /></div>
+                <span className="action-btn-label">Claim</span>
+              </button>
+              <button onClick={() => { haptic('light'); setMining(!mining); }} className="action-btn">
+                <div className="action-btn-icon" style={{ background: mining ? '#dcfce7' : '#fee2e2' }}><Power size={22} className={mining ? 'text-green-500' : 'text-red-500'} /></div>
+                <span className="action-btn-label">{mining ? 'Active' : 'Paused'}</span>
+              </button>
+            </div>
+
+            <div className="balance-card">
+              <div className="balance-card-header"><Wallet size={18} /><span>Your Balance</span></div>
+              <div className="balance-card-value"><span className="balance-amount">{balance.toLocaleString()}</span><span className="balance-unit">HP</span></div>
+              <div className="balance-card-footer">
+                <div className="balance-stat"><Ticket size={14} className="text-yellow-500" /><span>{inventory.tickets}</span></div>
+                <div className="balance-stat"><Coins size={14} className="text-purple-500" /><span>{inventory.tokens}</span></div>
+              </div>
+            </div>
+
+            <button onClick={canPlayTapGame ? () => { setTapCount(0); setTapTimeLeft(10); setTapGameActive(true); setShowTapGame(true); } : undefined} disabled={!canPlayTapGame} className="card w-full flex items-center gap-4" style={{ background: canPlayTapGame ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : '#f1f5f9', border: canPlayTapGame ? '1px solid #fcd34d' : '1px solid #e2e8f0', cursor: canPlayTapGame ? 'pointer' : 'default', padding: 16 }}>
+              <div style={{ fontSize: '2rem' }}>🎮</div>
+              <div style={{ flex: 1 }}><div style={{ fontWeight: 700, color: canPlayTapGame ? '#92400e' : '#94a3b8' }}>Daily Tap Game</div></div>
+              {canPlayTapGame && <Target size={20} className="text-yellow-600" />}
+            </button>
+          </div>
+        )}
+
+        {tab === 'store' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <button onClick={handleSpin} className="btn-primary" style={{ marginBottom: 20 }}>🎰 Spin Wheel - 0.001 ETH</button>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>Hardware</h2>
+            {HARDWARE_ITEMS.map(item => (
+              <div key={item.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.5rem' }}>{item.icon}</span>
+                    <div><div style={{ fontWeight: 700 }}>{item.name}</div><div style={{ fontSize: '0.75rem', color: '#22c55e' }}>+{item.boost} MH/s</div></div>
+                  </div>
+                  <button onClick={() => handleBuy(item)} style={{ padding: '10px 16px', borderRadius: 10, background: '#2563eb', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}>{item.price} Ξ</button>
+                </div>
+              </div>
+            ))}
+            <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: 16, marginBottom: 10 }}>Redeem ({balance.toLocaleString()} HP)</h3>
+
+            {/* USDC Redeem Card */}
+            <button onClick={handleRedeemUSDC} disabled={balance < MIN_HP_REDEEM} className="card w-full" style={{
+              background: balance >= MIN_HP_REDEEM ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : '#f1f5f9',
+              border: 'none',
+              padding: 20,
+              marginBottom: 12,
+              cursor: balance >= MIN_HP_REDEEM ? 'pointer' : 'not-allowed',
+              color: balance >= MIN_HP_REDEEM ? 'white' : '#94a3b8'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ width: 50, height: 50, background: 'rgba(255,255,255,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <DollarSign size={28} />
+                </div>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{USDC_REWARD} USDC</div>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700 }}>{balance >= MIN_HP_REDEEM ? '✓ Ready' : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} more`}</div>
+                </div>
+              </div>
+            </button>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button onClick={() => handleRedeem('ticket', 1000)} className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer' }}><Ticket size={24} className="text-yellow-500" style={{ margin: '0 auto 8px' }} /><div style={{ fontWeight: 700 }}>1 Ticket</div><div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>1,000 HP</div></button>
+              <button onClick={() => handleRedeem('token', 5000)} className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer' }}><Coins size={24} className="text-purple-500" style={{ margin: '0 auto 8px' }} /><div style={{ fontWeight: 700 }}>1 $RUSH</div><div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>5,000 HP</div></button>
+            </div>
+          </div>
+        )}
+
+        {tab === 'rank' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="badges-section"><div className="badges-title">Achievements</div><div className="badges-grid">{BADGES.map(b => (<div key={b.id} className="badge-item"><div className={`badge-icon ${unlockedBadges.includes(b.id) ? 'unlocked' : 'locked'}`}>{b.icon}</div><div className="badge-label">{b.label}</div></div>))}</div></div>
+            <div className="podium">{[LEADERBOARD[1], LEADERBOARD[0], LEADERBOARD[2]].map(u => (<div key={u.rank} className={`podium-item podium-${u.rank}`}><div className="podium-rank">#{u.rank}</div><div className="podium-avatar">{u.avatar}</div><div className="podium-name">{u.name}</div></div>))}</div>
+            <div className="leaderboard-list">{LEADERBOARD.slice(3).map(u => (<div key={u.rank} className="leaderboard-row"><span className="leaderboard-rank">{u.rank}</span><span className="leaderboard-name">{u.name}</span><span className="leaderboard-score">{u.score.toLocaleString()}</span></div>))}<div className="leaderboard-row self"><span className="leaderboard-rank">99</span><span className="leaderboard-name">You</span><span className="leaderboard-score">{totalEarned.toLocaleString()}</span></div></div>
+          </div>
+        )}
+
+        {tab === 'profile' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+              {context?.user?.pfpUrl ? (<img src={context.user.pfpUrl} alt="" style={{ width: 80, height: 80, borderRadius: '50%', margin: '0 auto 16px', border: '3px solid #3b82f6' }} />) : (<div style={{ width: 80, height: 80, borderRadius: '50%', margin: '0 auto 16px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={40} className="text-white" /></div>)}
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{context?.user?.displayName || 'Anonymous'}</h2>
+              <p style={{ color: '#64748b', marginBottom: 8 }}>@{context?.user?.username || 'guest'}</p>
+              <span className={`tier-badge ${userTier.class}`}>{userTier.icon} {userTier.name}</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{totalEarned.toLocaleString()}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Total HP</div></div><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{streak}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Streak</div></div><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{unlockedBadges.length}/{BADGES.length}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Badges</div></div></div>
+            </div>
+            <button onClick={() => setShowHardware(true)} className="btn-secondary" style={{ marginBottom: 16 }}><Package size={18} /> View Hardware</button>
+            <button onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🚀 Mining on HashRush!\n⚡ ${totalEarned.toLocaleString()} HP\n🏆 ${userTier.name} Tier`)}&embeds[]=https://hashrush.vercel.app`)} className="btn-primary"><Share2 size={18} /> Share</button>
+          </div>
+        )}
+      </main>
+
+      <div className="nav-bar">{[{ id: 'mine', icon: Zap, label: 'Mine' }, { id: 'store', icon: ShoppingBag, label: 'Shop' }, { id: 'rank', icon: Trophy, label: 'Rank' }, { id: 'profile', icon: User, label: 'Profile' }].map(item => (<button key={item.id} onClick={() => { haptic('light'); setTab(item.id as Tab); }} className={`nav-item ${tab === item.id ? 'active' : ''}`}><item.icon size={20} /><span>{item.label}</span></button>))}</div>
+    </>
+  );
+}
