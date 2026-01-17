@@ -400,27 +400,47 @@ export default function Home() {
 
   const handleClaimPoints = async () => {
     if (points < 1) return;
+
+    if (!walletConnected) {
+      await connectWallet();
+      return;
+    }
+
+    if (!isCorrectChain) {
+      await switchToBase();
+      if (!isCorrectChain) {
+        showToast('⚠️', 'Switch to Base Mainnet');
+        return;
+      }
+    }
+
     haptic('medium');
     try {
       const fee = ethers.parseEther("0.0001");
-      await sdk.wallet.ethProvider.request({
+      const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
           to: OWNER_ADDRESS as `0x${string}`,
           value: ("0x" + fee.toString(16)) as `0x${string}`,
-          chainId: "0x2105" // Base Mainnet (8453)
+          chainId: "0x2105" // Base Mainnet
         }]
       });
-      const claimed = Math.floor(points);
-      setBalance(b => b + claimed);
-      setTotalEarned(t => t + claimed);
-      setPoints(0);
-      pointsRef.current = 0;
-      setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
-      if (soundEnabled) playKaching();
-      showToast('💰', `Claimed ${claimed} HP!`);
-    } catch {
-      if (process.env.NODE_ENV === 'development') {
+
+      if (tx) {
+        const claimed = Math.floor(points);
+        setBalance(b => b + claimed);
+        setTotalEarned(t => t + claimed);
+        setPoints(0);
+        pointsRef.current = 0;
+        setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
+        if (soundEnabled) playKaching();
+        showToast('💰', `Claimed ${claimed} HP!`);
+      }
+    } catch (error) {
+      console.error('Claim error:', error);
+      if (error instanceof Error && error.message.includes('user rejected')) {
+        showToast('❌', 'Claim rejected');
+      } else if (process.env.NODE_ENV === 'development') {
         const claimed = Math.floor(points);
         setBalance(b => b + claimed);
         setTotalEarned(t => t + claimed);
@@ -428,16 +448,30 @@ export default function Home() {
         pointsRef.current = 0;
         setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
         showToast('💰', `Claimed ${claimed} HP!`);
+      } else {
+        showToast('❌', 'Claim failed');
       }
     }
   };
 
   const handleBuy = async (item: typeof HARDWARE_ITEMS[0]) => {
+    if (!walletConnected) {
+      await connectWallet();
+      return;
+    }
+
+    if (!isCorrectChain) {
+      await switchToBase();
+      if (!isCorrectChain) {
+        showToast('⚠️', 'Switch to Base Mainnet');
+        return;
+      }
+    }
+
     haptic('medium');
-    if (soundEnabled) playKaching();
     try {
       const cost = ethers.parseEther(item.price);
-      await sdk.wallet.ethProvider.request({
+      const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
           to: OWNER_ADDRESS as `0x${string}`,
@@ -445,10 +479,17 @@ export default function Home() {
           chainId: "0x2105" // Base Mainnet
         }]
       });
-      completeHardwarePurchase(item);
-    } catch {
-      if (process.env.NODE_ENV === 'development' && confirm(`Dev: Buy ${item.name}?`)) {
+      if (tx) {
         completeHardwarePurchase(item);
+      }
+    } catch (error) {
+      console.error('Buy error:', error);
+      if (error instanceof Error && error.message.includes('user rejected')) {
+        showToast('❌', 'Purchase rejected');
+      } else if (process.env.NODE_ENV === 'development' && confirm(`Dev: Buy ${item.name}?`)) {
+        completeHardwarePurchase(item);
+      } else {
+        showToast('❌', 'Purchase failed');
       }
     }
   };
@@ -544,11 +585,25 @@ export default function Home() {
 
   const handleSpin = async () => {
     if (spinning) return;
+
+    if (!walletConnected) {
+      await connectWallet();
+      return;
+    }
+
+    if (!isCorrectChain) {
+      await switchToBase();
+      if (!isCorrectChain) {
+        showToast('⚠️', 'Switch to Base Mainnet');
+        return;
+      }
+    }
+
     haptic('medium');
     setShowSpinModal(true);
     try {
       const fee = ethers.parseEther("0.001");
-      await sdk.wallet.ethProvider.request({
+      const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
           to: OWNER_ADDRESS as `0x${string}`,
@@ -556,10 +611,20 @@ export default function Home() {
           chainId: "0x2105" // Base Mainnet
         }]
       });
-      performSpin();
-    } catch {
-      if (process.env.NODE_ENV === 'development') performSpin();
-      else setShowSpinModal(false);
+      if (tx) {
+        performSpin();
+      }
+    } catch (error) {
+      console.error('Spin error:', error);
+      if (error instanceof Error && error.message.includes('user rejected')) {
+        showToast('❌', 'Spin rejected');
+        setShowSpinModal(false);
+      } else if (process.env.NODE_ENV === 'development') {
+        performSpin();
+      } else {
+        showToast('❌', 'Spin failed');
+        setShowSpinModal(false);
+      }
     }
   };
 
