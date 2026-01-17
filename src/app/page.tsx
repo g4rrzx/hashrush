@@ -122,6 +122,12 @@ export default function Home() {
   const [toast, setToast] = useState<{ icon: string; text: string } | null>(null);
   const [showHardware, setShowHardware] = useState(false);
 
+  // Wallet connection
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isCorrectChain, setIsCorrectChain] = useState(false);
+  const BASE_CHAIN_ID = "0x2105"; // Base Mainnet = 8453 = 0x2105
+
   const [showTapGame, setShowTapGame] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const [tapTimeLeft, setTapTimeLeft] = useState(10);
@@ -145,6 +151,93 @@ export default function Home() {
   const haptic = useCallback((type: 'light' | 'medium' | 'heavy') => {
     try { sdk.haptics.impactOccurred(type); } catch { }
   }, []);
+
+  // Connect wallet
+  const connectWallet = async () => {
+    haptic('medium');
+    try {
+      const accounts = await sdk.wallet.ethProvider.request({
+        method: 'eth_requestAccounts'
+      }) as string[];
+
+      if (accounts && accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        setWalletConnected(true);
+
+        // Check chain
+        const chainId = await sdk.wallet.ethProvider.request({
+          method: 'eth_chainId'
+        }) as string;
+
+        if (chainId === BASE_CHAIN_ID) {
+          setIsCorrectChain(true);
+          showToast('✅', 'Wallet connected!');
+        } else {
+          setIsCorrectChain(false);
+          // Try to switch to Base
+          await switchToBase();
+        }
+      }
+    } catch (error) {
+      console.error('Connect error:', error);
+      showToast('❌', 'Connection failed');
+    }
+  };
+
+  // Switch to Base Mainnet
+  const switchToBase = async () => {
+    try {
+      await sdk.wallet.ethProvider.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: BASE_CHAIN_ID }]
+      });
+      setIsCorrectChain(true);
+      showToast('🔵', 'Switched to Base!');
+    } catch (switchError: unknown) {
+      // Chain not added, try to add it
+      if ((switchError as { code?: number })?.code === 4902) {
+        try {
+          await sdk.wallet.ethProvider.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: BASE_CHAIN_ID,
+              chainName: 'Base',
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+              rpcUrls: ['https://mainnet.base.org'],
+              blockExplorerUrls: ['https://basescan.org']
+            }]
+          });
+          setIsCorrectChain(true);
+        } catch (addError) {
+          console.error('Add chain error:', addError);
+          showToast('❌', 'Please add Base network');
+        }
+      }
+    }
+  };
+
+  // Check wallet on load
+  useEffect(() => {
+    const checkWallet = async () => {
+      try {
+        const accounts = await sdk.wallet.ethProvider.request({
+          method: 'eth_accounts'
+        }) as string[];
+
+        if (accounts && accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+          setWalletConnected(true);
+
+          const chainId = await sdk.wallet.ethProvider.request({
+            method: 'eth_chainId'
+          }) as string;
+          setIsCorrectChain(chainId === BASE_CHAIN_ID);
+        }
+      } catch { }
+    };
+
+    if (!isLoading) checkWallet();
+  }, [isLoading, BASE_CHAIN_ID]);
 
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add('dark');
@@ -673,10 +766,86 @@ export default function Home() {
             <div className="header-info"><h1>HashRush</h1><span>Season 1</span></div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {!walletConnected ? (
+              <button onClick={connectWallet} style={{
+                padding: '8px 14px',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <Wallet size={14} /> Connect
+              </button>
+            ) : (
+              <button onClick={!isCorrectChain ? switchToBase : undefined} style={{
+                padding: '6px 12px',
+                background: isCorrectChain ? '#dcfce7' : '#fef3c7',
+                color: isCorrectChain ? '#166534' : '#92400e',
+                border: `1px solid ${isCorrectChain ? '#86efac' : '#fcd34d'}`,
+                borderRadius: 10,
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                cursor: isCorrectChain ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4
+              }}>
+                {isCorrectChain ? '🔵' : '⚠️'} {walletAddress?.slice(0, 4)}...{walletAddress?.slice(-4)}
+              </button>
+            )}
             <button onClick={() => setShowSettings(true)} className="settings-btn"><Settings size={16} /></button>
-            <span className={`tier-badge ${userTier.class}`}>{userTier.icon} {userTier.name}</span>
           </div>
         </div>
+
+        {/* Wallet not connected warning */}
+        {!walletConnected && (
+          <button onClick={connectWallet} style={{
+            width: '100%',
+            padding: 16,
+            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 16,
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10
+          }}>
+            <Wallet size={20} /> Connect Wallet to Start
+          </button>
+        )}
+
+        {/* Wrong chain warning */}
+        {walletConnected && !isCorrectChain && (
+          <button onClick={switchToBase} style={{
+            width: '100%',
+            padding: 14,
+            background: '#fef3c7',
+            color: '#92400e',
+            border: '1px solid #fcd34d',
+            borderRadius: 16,
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10
+          }}>
+            ⚠️ Switch to Base Network
+          </button>
+        )}
 
         {tab === 'mine' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
