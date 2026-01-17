@@ -10,9 +10,12 @@
         "iconUrl": "https://hashrush.vercel.app/icon.png",
         "homeUrl": "https://hashrush.vercel.app",
         "imageUrl": "https://hashrush.vercel.app/splash.png",
-        "buttonTitle": "Open",
+        "buttonTitle": "Start Mining",
         "splashImageUrl": "https://hashrush.vercel.app/splash.png",
         "splashBackgroundColor": "#0f172a",
-        "webhookUrl": "https://hashrush.vercel.app/api/webhook"
+        "webhookUrl": "https://hashrush.vercel.app/api/webhook",
+        "subtitle": "Premium Crypto Miner & USDC Rewards",
+        "description": "Mine, Earn, and Win! Experience the ultimate crypto mining simulation on Base. Build your rig, spin the wheel for prizes, and redeem your hard-earned HP for real USDC rewards.",
+        "primaryCategory": "games"
     }
 }
