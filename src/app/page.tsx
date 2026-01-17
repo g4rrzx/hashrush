@@ -254,10 +254,20 @@ export default function Home() {
 
   // Handle Referral on Load
   useEffect(() => {
-    if (isLoading) return;
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get('ref');
+    if (isLoading || !context) return;
+
+    // Check both window.location and farcaster context for ref param
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // Some Farcaster context versions use different structures for location
+    const sdkContext = context as any;
+    const contextSearch = sdkContext?.location?.search || '';
+    const contextParams = contextSearch ? new URLSearchParams(contextSearch) : null;
+
+    const ref = urlParams.get('ref') || contextParams?.get('ref');
+
     if (ref && !localStorage.getItem('hr_ref_claimed')) {
+      console.log('Referral detected from FID:', ref);
       const bonus = 500;
       setBalance(b => b + bonus);
       setTotalEarned(t => t + bonus);
@@ -266,7 +276,7 @@ export default function Home() {
       haptic('heavy');
       triggerConfetti();
     }
-  }, [isLoading]);
+  }, [isLoading, context]);
 
   const getReferralLink = () => {
     const fid = context?.user?.fid || '0';
@@ -469,12 +479,14 @@ export default function Home() {
 
     try {
       const value = ethers.parseEther("0.0001");
+      // Use checksummed address and standard hex value for Warpcast compatibility
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
-          to: OWNER_ADDRESS as `0x${string}`,
+          to: ethers.getAddress(OWNER_ADDRESS) as `0x${string}`,
           value: ("0x" + value.toString(16)) as `0x${string}`,
-          chainId: "0x2105" // Base Mainnet
+          // Some wallets fail if chainId is passed inside the transaction object
+          // The SDK handles network switching via switchToBase already
         }]
       });
 
@@ -490,18 +502,11 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Claim error:', error);
-      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('user rejected') || msg.includes('ACTION_REJECTED')) {
         showToast('❌', 'Claim rejected');
-      } else if (process.env.NODE_ENV === 'development') {
-        const claimed = Math.floor(points);
-        setBalance(b => b + claimed);
-        setTotalEarned(t => t + claimed);
-        setPoints(0);
-        pointsRef.current = 0;
-        setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
-        showToast('💰', `Claimed ${claimed} HP!`);
       } else {
-        showToast('❌', 'Claim failed');
+        showToast('❌', 'Transaction Error');
       }
     } finally {
       clearTimeout(timeout);
@@ -525,16 +530,15 @@ export default function Home() {
 
     setIsTransacting(true);
     haptic('medium');
-    const timeout = setTimeout(() => setIsTransacting(false), 30000);
+    const timeout = setTimeout(() => setIsTransacting(false), 15000);
 
     try {
       const cost = ethers.parseEther(item.price);
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
-          to: OWNER_ADDRESS as `0x${string}`,
-          value: ("0x" + cost.toString(16)) as `0x${string}`,
-          chainId: "0x2105" // Base Mainnet
+          to: ethers.getAddress(OWNER_ADDRESS) as `0x${string}`,
+          value: ("0x" + cost.toString(16)) as `0x${string}`
         }]
       });
 
@@ -543,10 +547,9 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Buy error:', error);
-      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('user rejected') || msg.includes('ACTION_REJECTED')) {
         showToast('❌', 'Purchase rejected');
-      } else if (process.env.NODE_ENV === 'development' && confirm(`Dev: Buy ${item.name}?`)) {
-        completeHardwarePurchase(item);
       } else {
         showToast('❌', 'Purchase failed');
       }
