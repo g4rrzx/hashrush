@@ -1395,12 +1395,18 @@ export default function Home() {
       </main>
 
       {/* Settings Modal - Popup Style */}
+      {/* Settings Modal - Popup Style */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 animate-in fade-in" onClick={() => setShowSettings(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowSettings(false)}
+              className="absolute top-4 right-4 p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+            >
+              <span className="text-xl font-bold leading-none">×</span>
+            </button>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold">Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full"><Settings size={20} /></button>
             </div>
 
             <div className="space-y-4">
