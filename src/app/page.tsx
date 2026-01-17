@@ -270,9 +270,10 @@ export default function Home() {
 
   const getReferralLink = () => {
     const fid = context?.user?.fid || '0';
-    const baseUrl = "https://hashrush.vercel.app";
-    const launchUrl = `https://warpcast.com/~/launch-mini-app?name=HashRush&url=${encodeURIComponent(`${baseUrl}?ref=${fid}`)}`;
-    return launchUrl;
+    // Use official Farcaster Directory format
+    const baseUrl = "https://farcaster.xyz/miniapps/wbQq2mQrDpWS/hashrush";
+    const referralUrl = `${baseUrl}?ref=${fid}`;
+    return referralUrl;
   };
 
   const copyReferralLink = () => {
