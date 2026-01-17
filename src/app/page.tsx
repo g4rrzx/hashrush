@@ -142,6 +142,8 @@ export default function Home() {
   const [tapGameActive, setTapGameActive] = useState(false);
   const [lastTapGameDate, setLastTapGameDate] = useState<string | null>(null);
   const [canPlayTapGame, setCanPlayTapGame] = useState(true);
+  const [contractPoolBalance, setContractPoolBalance] = useState<string>('0');
+  const [userCooldown, setUserCooldown] = useState<number>(0);
 
   const pointsRef = useRef(points);
   const prevBadgesRef = useRef<string[]>([]);
@@ -245,7 +247,34 @@ export default function Home() {
     };
 
     if (!isLoading) checkWallet();
+    if (!isLoading) checkWallet();
   }, [isLoading, BASE_CHAIN_ID]);
+
+  // Check Contract State (Pool Balance & Cooldown)
+  useEffect(() => {
+    const checkContract = async () => {
+      if (!walletConnected || !isCorrectChain) return;
+      try {
+        const provider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+        // Get Pool Balance
+        const poolBal = await contract.getPoolBalance();
+        setContractPoolBalance(ethers.formatUnits(poolBal, 6)); // USDC 6 decimals
+
+        // Get Cooldown
+        if (walletAddress) {
+          const cooldown = await contract.getRemainingCooldown(walletAddress);
+          setUserCooldown(Number(cooldown));
+        }
+      } catch (err) {
+        console.error("Contract check failed:", err);
+      }
+    };
+    checkContract();
+    const interval = setInterval(checkContract, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, [walletConnected, isCorrectChain, walletAddress]);
 
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add('dark');
@@ -604,6 +633,19 @@ export default function Home() {
       }
     }
 
+    // Check Pool Balance
+    if (parseFloat(contractPoolBalance) < USDC_REWARD) {
+      showToast('⚠️', 'Reward Pool Empty - Try again later');
+      return;
+    }
+
+    // Check Cooldown
+    if (userCooldown > 0) {
+      const hrs = Math.ceil(userCooldown / 3600);
+      showToast('⏳', `Cooldown active: Wait ${hrs}h`);
+      return;
+    }
+
     setIsTransacting(true);
     haptic('medium');
     const timeout = setTimeout(() => setIsTransacting(false), 30000);
@@ -617,10 +659,9 @@ export default function Home() {
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
-          to: CONTRACT_ADDRESS as `0x${string}`,
+          to: CONTRACT_ADDRESS as `0x${string}`, // Already checks validity
           data: data as `0x${string}`,
-          value: "0x0",
-          chainId: "0x2105" // Base Mainnet
+          value: "0x0" // No ETH sent, only gas paid
         }]
       });
 
@@ -632,19 +673,17 @@ export default function Home() {
         triggerConfetti();
         showToast('💵', `Claimed ${USDC_REWARD} USDC!`);
         setTransactions(prev => [...prev, { type: 'claim', amount: `+${USDC_REWARD} USDC`, time: Date.now() }]);
+        // Reset cooldown locally to prevent immediate retry
+        setUserCooldown(86400);
       }
     } catch (error) {
       console.error('Redeem error:', error);
-      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('user rejected') || msg.includes('ACTION_REJECTED')) {
         showToast('❌', 'Transaction rejected');
       } else {
-        if (process.env.NODE_ENV === 'development') {
-          setBalance(0);
-          showToast('💵', `[Dev] Claimed ${USDC_REWARD} USDC!`);
-          triggerConfetti();
-        } else {
-          showToast('❌', 'Transaction failed');
-        }
+        // Often related to insufficient ETH for gas
+        showToast('❌', 'Failed: Check ETH for Gas');
       }
     } finally {
       clearTimeout(timeout);
@@ -1245,7 +1284,8 @@ export default function Home() {
                   <DollarSign size={32} />
                 </div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{USDC_REWARD} USDC</h3>
-                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 12 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+                <p style={{ fontSize: '0.7rem', color: '#cbd5e1', marginBottom: 12 }}>Pool: {contractPoolBalance} USDC</p>
 
                 <div style={{
                   background: balance >= MIN_HP_REDEEM ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
@@ -1255,7 +1295,7 @@ export default function Home() {
                   fontSize: '0.85rem',
                   fontWeight: 700
                 }}>
-                  {balance >= MIN_HP_REDEEM ? '✨ Ready to Claim' : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`}
+                  {balance >= MIN_HP_REDEEM ? (parseFloat(contractPoolBalance) >= USDC_REWARD ? '✨ Ready to Claim' : '⚠️ Pool Empty') : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`}
                 </div>
               </button>
             </div>
