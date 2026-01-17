@@ -508,15 +508,24 @@ export default function Home() {
 
       console.log("Sending Claim TX");
 
+      // Transaction parameters details for wallet visibility
+      const txParams = {
+        to: OWNER_ADDRESS as `0x${string}`,
+        from: walletAddress as `0x${string}`,
+        value: ("0x" + value.toString(16)) as `0x${string}`,
+        data: "0x" as `0x${string}`, // Empty data for ETH transfer
+        chainId: "0x2105" as `0x${string}` // Base Mainnet
+      };
+
+      console.log("TX Params:", txParams);
+
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [{
-          to: OWNER_ADDRESS as `0x${string}`,
-          value: ("0x" + value.toString(16)) as `0x${string}`
-        }]
+        params: [txParams]
       });
 
       if (tx) {
+        // Success Logic...
         const claimed = Math.floor(points);
         setBalance(b => b + claimed);
         setTotalEarned(t => t + claimed);
@@ -553,12 +562,18 @@ export default function Home() {
 
     try {
       const cost = ethers.parseEther(item.price);
+
+      const txParams = {
+        to: OWNER_ADDRESS as `0x${string}`,
+        from: walletAddress as `0x${string}`,
+        value: ("0x" + cost.toString(16)) as `0x${string}`,
+        data: "0x" as `0x${string}`,
+        chainId: "0x2105" as `0x${string}`
+      };
+
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [{
-          to: OWNER_ADDRESS as `0x${string}`,
-          value: ("0x" + cost.toString(16)) as `0x${string}`
-        }]
+        params: [txParams]
       });
 
       if (tx) {
