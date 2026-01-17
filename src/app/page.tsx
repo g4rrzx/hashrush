@@ -503,27 +503,17 @@ export default function Home() {
     setIsTransacting(true);
     haptic('medium');
 
-    // Safety timeout to prevent permanent loading stuck
-    const timeout = setTimeout(() => setIsTransacting(false), 30000);
-
     try {
       const value = ethers.parseEther("0.0001");
 
-      // Construct exact transaction params for Farcaster Wallet compatibility
-      // Must use Hex strings for value and gas
-      const txParams = {
-        to: OWNER_ADDRESS as `0x${string}`,
-        from: walletAddress as `0x${string}`,
-        value: ("0x" + value.toString(16)) as `0x${string}`,
-        data: "0x" as `0x${string}`, // Explicitly empty data for ETH transfer
-        chainId: "0x2105" as `0x${string}` // Base Mainnet Hex
-      };
-
-      console.log("Sending Claim TX:", txParams);
+      console.log("Sending Claim TX");
 
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [txParams]
+        params: [{
+          to: OWNER_ADDRESS as `0x${string}`,
+          value: ("0x" + value.toString(16)) as `0x${string}`
+        }]
       });
 
       if (tx) {
@@ -538,15 +528,8 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error('Claim error:', error);
-      // Show more specific error
-      const msg = error?.message || error?.code || 'Unknown error';
-      if (typeof msg === 'string' && (msg.includes('rejected') || msg.includes('denied'))) {
-        showToast('❌', 'Claim rejected');
-      } else {
-        showToast('❌', `Error: ${msg.slice(0, 20)}...`);
-      }
+      showToast('❌', 'Transaction Failed');
     } finally {
-      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -567,14 +550,13 @@ export default function Home() {
 
     setIsTransacting(true);
     haptic('medium');
-    const timeout = setTimeout(() => setIsTransacting(false), 15000);
 
     try {
       const cost = ethers.parseEther(item.price);
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
-          to: ethers.getAddress(OWNER_ADDRESS) as `0x${string}`,
+          to: OWNER_ADDRESS as `0x${string}`,
           value: ("0x" + cost.toString(16)) as `0x${string}`
         }]
       });
@@ -584,14 +566,8 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Buy error:', error);
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('user rejected') || msg.includes('ACTION_REJECTED')) {
-        showToast('❌', 'Purchase rejected');
-      } else {
-        showToast('❌', 'Purchase failed');
-      }
+      showToast('❌', 'Purchase failed');
     } finally {
-      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -656,7 +632,6 @@ export default function Home() {
 
     setIsTransacting(true);
     haptic('medium');
-    const timeout = setTimeout(() => setIsTransacting(false), 30000);
 
     try {
       // Create contract interface and data
@@ -686,15 +661,8 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Redeem error:', error);
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('user rejected') || msg.includes('ACTION_REJECTED')) {
-        showToast('❌', 'Transaction rejected');
-      } else {
-        // Often related to insufficient ETH for gas
-        showToast('❌', 'Failed: Check ETH for Gas');
-      }
+      showToast('❌', 'Redeem Failed');
     } finally {
-      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -718,7 +686,6 @@ export default function Home() {
     setIsTransacting(true);
     haptic('medium');
     setShowSpinModal(true);
-    const timeout = setTimeout(() => setIsTransacting(false), 30000);
 
     try {
       const fee = ethers.parseEther("0.001");
@@ -726,8 +693,7 @@ export default function Home() {
         method: "eth_sendTransaction",
         params: [{
           to: OWNER_ADDRESS as `0x${string}`,
-          value: ("0x" + fee.toString(16)) as `0x${string}`,
-          chainId: "0x2105" // Base Mainnet
+          value: ("0x" + fee.toString(16)) as `0x${string}`
         }]
       });
 
@@ -736,17 +702,8 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Spin error:', error);
-      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
-        showToast('❌', 'Spin rejected');
-        setShowSpinModal(false);
-      } else if (process.env.NODE_ENV === 'development') {
-        performSpin();
-      } else {
-        showToast('❌', 'Spin failed');
-        setShowSpinModal(false);
-      }
+      showToast('❌', 'Spin Failed');
     } finally {
-      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -794,58 +751,7 @@ export default function Home() {
       <div className="app-bg" />
 
       {/* Global Loading Overlay */}
-      {isTransacting && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)',
-          padding: 20
-        }}>
-          <div style={{
-            background: darkMode ? '#1e293b' : 'white',
-            borderRadius: 24,
-            padding: 32,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 16,
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-            maxWidth: 300,
-            width: '100%',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: 48,
-              height: 48,
-              border: '4px solid #3b82f6',
-              borderTopColor: 'transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }} />
-            <h3 style={{ fontWeight: 800, fontSize: '1.25rem', color: darkMode ? 'white' : 'black' }}>Transaction Pending</h3>
-            <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Please check your wallet for confirmation.</p>
-            <button
-              onClick={() => setIsTransacting(false)}
-              style={{
-                marginTop: 10,
-                color: '#ef4444',
-                background: 'transparent',
-                border: 'none',
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontSize: '0.8rem'
-              }}
-            >
-              Wait too long? Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Global Loading Overlay Removed */}
 
       {/* Confetti */}
       {showConfetti && (
