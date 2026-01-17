@@ -63,11 +63,12 @@ const playKaching = () => {
 
 const getJackpotTime = () => {
   const now = new Date();
-  const nextSunday = new Date(now);
-  nextSunday.setUTCDate(now.getUTCDate() + (7 - now.getUTCDay()) % 7);
-  nextSunday.setUTCHours(20, 0, 0, 0);
-  if (nextSunday <= now) nextSunday.setUTCDate(nextSunday.getUTCDate() + 7);
-  return nextSunday.getTime() - now.getTime();
+  const nextMonthly = new Date(now);
+  // Set to 1st of next month
+  nextMonthly.setUTCMonth(now.getUTCMonth() + 1);
+  nextMonthly.setUTCDate(1);
+  nextMonthly.setUTCHours(20, 0, 0, 0);
+  return nextMonthly.getTime() - now.getTime();
 };
 
 const getStreakResetTime = () => {
