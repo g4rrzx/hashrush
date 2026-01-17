@@ -1,18 +1,18 @@
 {
     "accountAssociation": {
         "header": "eyJmaWQiOiA4Njk5OTksICJ0eXBlIjogImN1c3RvZHkiLCAia2V5IjogIjB4N0Q0MDBGRDFGNTkyN2YwZmQ1NDRhZDIwNjhiMzUzYjYzYjE1Y2RmOSJ9",
-        "payload": "eyJkb21haW4iOiAibXktZnJhbWUtYXBwLnZlcmNlbC5hcHAifQ",
-        "signature": "MHgyY..."
+        "payload": "eyJkb21haW4iOiAiaGFzaHJ1c2gudmVyY2VsLmFwcCJ9",
+        "signature": "SIGNATURE_PLACEHOLDER"
     },
     "frame": {
         "version": "1",
         "name": "HashRush",
-        "iconUrl": "https://cdn-icons-png.flaticon.com/512/2040/2040520.png",
-        "homeUrl": "https://localhost:3000",
-        "imageUrl": "https://cdn-icons-png.flaticon.com/512/2040/2040520.png",
-        "buttonTitle": "Start Rushing",
-        "splashImageUrl": "https://cdn-icons-png.flaticon.com/512/2040/2040520.png",
-        "splashBackgroundColor": "#000000",
-        "webhookUrl": "https://localhost:3000/api/webhook"
+        "iconUrl": "https://hashrush.vercel.app/icon.png",
+        "homeUrl": "https://hashrush.vercel.app",
+        "imageUrl": "https://hashrush.vercel.app/splash.png",
+        "buttonTitle": "Start Mining",
+        "splashImageUrl": "https://hashrush.vercel.app/splash.png",
+        "splashBackgroundColor": "#0f172a",
+        "webhookUrl": "https://hashrush.vercel.app/api/webhook"
     }
 }
