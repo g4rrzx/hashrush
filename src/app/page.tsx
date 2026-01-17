@@ -462,15 +462,18 @@ export default function Home() {
 
     setIsTransacting(true);
     haptic('medium');
+
+    // Safety timeout to prevent permanent loading stuck
+    const timeout = setTimeout(() => setIsTransacting(false), 30000);
+
     try {
-      const fee = ethers.parseEther("0.0001");
-      const tx = await sdk.wallet.ethProvider.request({
-        method: "eth_sendTransaction",
-        params: [{
-          to: OWNER_ADDRESS as `0x${string}`,
-          value: ("0x" + fee.toString(16)) as `0x${string}`,
-          chainId: "0x2105" // Base Mainnet
-        }]
+      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
+      const signer = await browserProvider.getSigner();
+
+      const tx = await signer.sendTransaction({
+        to: OWNER_ADDRESS,
+        value: ethers.parseEther("0.0001")
+        // chainId removed for compatibility with Warpcast bridge
       });
 
       if (tx) {
@@ -485,7 +488,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Claim error:', error);
-      if (error instanceof Error && error.message.includes('user rejected')) {
+      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
         showToast('❌', 'Claim rejected');
       } else if (process.env.NODE_ENV === 'development') {
         const claimed = Math.floor(points);
@@ -499,6 +502,7 @@ export default function Home() {
         showToast('❌', 'Claim failed');
       }
     } finally {
+      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -519,22 +523,24 @@ export default function Home() {
 
     setIsTransacting(true);
     haptic('medium');
+    const timeout = setTimeout(() => setIsTransacting(false), 30000);
+
     try {
-      const cost = ethers.parseEther(item.price);
-      const tx = await sdk.wallet.ethProvider.request({
-        method: "eth_sendTransaction",
-        params: [{
-          to: OWNER_ADDRESS as `0x${string}`,
-          value: ("0x" + cost.toString(16)) as `0x${string}`,
-          chainId: "0x2105" // Base Mainnet
-        }]
+      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
+      const signer = await browserProvider.getSigner();
+
+      const tx = await signer.sendTransaction({
+        to: OWNER_ADDRESS,
+        value: ethers.parseEther(item.price)
+        // chainId removed
       });
+
       if (tx) {
         completeHardwarePurchase(item);
       }
     } catch (error) {
       console.error('Buy error:', error);
-      if (error instanceof Error && error.message.includes('user rejected')) {
+      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
         showToast('❌', 'Purchase rejected');
       } else if (process.env.NODE_ENV === 'development' && confirm(`Dev: Buy ${item.name}?`)) {
         completeHardwarePurchase(item);
@@ -542,6 +548,7 @@ export default function Home() {
         showToast('❌', 'Purchase failed');
       }
     } finally {
+      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -593,21 +600,21 @@ export default function Home() {
 
     setIsTransacting(true);
     haptic('medium');
+    const timeout = setTimeout(() => setIsTransacting(false), 30000);
 
     try {
-      // Create contract interface
+      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
+      const signer = await browserProvider.getSigner();
+
+      // Create contract interface and data
       const iface = new ethers.Interface(CONTRACT_ABI);
       const data = iface.encodeFunctionData("redeem", [BigInt(balance)]);
 
-      // Call contract
-      const tx = await sdk.wallet.ethProvider.request({
-        method: "eth_sendTransaction",
-        params: [{
-          to: CONTRACT_ADDRESS as `0x${string}`,
-          data: data as `0x${string}`,
-          value: "0x0",
-          chainId: "0x2105" // Base Mainnet
-        }]
+      // Call contract via ethers
+      const tx = await signer.sendTransaction({
+        to: CONTRACT_ADDRESS,
+        data: data
+        // chainId removed
       });
 
       if (tx) {
@@ -621,8 +628,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Redeem error:', error);
-      // Detailed error for user
-      if (error instanceof Error && error.message.includes('user rejected')) {
+      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
         showToast('❌', 'Transaction rejected');
       } else {
         if (process.env.NODE_ENV === 'development') {
@@ -630,10 +636,11 @@ export default function Home() {
           showToast('💵', `[Dev] Claimed ${USDC_REWARD} USDC!`);
           triggerConfetti();
         } else {
-          showToast('❌', 'Transaction failed. Check balance.');
+          showToast('❌', 'Transaction failed');
         }
       }
     } finally {
+      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -657,22 +664,24 @@ export default function Home() {
     setIsTransacting(true);
     haptic('medium');
     setShowSpinModal(true);
+    const timeout = setTimeout(() => setIsTransacting(false), 30000);
+
     try {
-      const fee = ethers.parseEther("0.001");
-      const tx = await sdk.wallet.ethProvider.request({
-        method: "eth_sendTransaction",
-        params: [{
-          to: OWNER_ADDRESS as `0x${string}`,
-          value: ("0x" + fee.toString(16)) as `0x${string}`,
-          chainId: "0x2105" // Base Mainnet
-        }]
+      const browserProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
+      const signer = await browserProvider.getSigner();
+
+      const tx = await signer.sendTransaction({
+        to: OWNER_ADDRESS,
+        value: ethers.parseEther("0.001")
+        // chainId removed
       });
+
       if (tx) {
         performSpin();
       }
     } catch (error) {
       console.error('Spin error:', error);
-      if (error instanceof Error && error.message.includes('user rejected')) {
+      if (error instanceof Error && (error.message.includes('user rejected') || error.message.includes('ACTION_REJECTED'))) {
         showToast('❌', 'Spin rejected');
         setShowSpinModal(false);
       } else if (process.env.NODE_ENV === 'development') {
@@ -682,6 +691,7 @@ export default function Home() {
         setShowSpinModal(false);
       }
     } finally {
+      clearTimeout(timeout);
       setIsTransacting(false);
     }
   };
@@ -730,11 +740,54 @@ export default function Home() {
 
       {/* Global Loading Overlay */}
       {isTransacting && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 flex flex-col items-center gap-4 shadow-2xl scale-in">
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <div className="text-lg font-bold dark:text-white">Transaction Pending...</div>
-            <div className="text-sm text-slate-500 text-center">Check your wallet popup</div>
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+          padding: 20
+        }}>
+          <div style={{
+            background: darkMode ? '#1e293b' : 'white',
+            borderRadius: 24,
+            padding: 32,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            maxWidth: 300,
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: 48,
+              height: 48,
+              border: '4px solid #3b82f6',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <h3 style={{ fontWeight: 800, fontSize: '1.25rem', color: darkMode ? 'white' : 'black' }}>Transaction Pending</h3>
+            <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Please check your wallet for confirmation.</p>
+            <button
+              onClick={() => setIsTransacting(false)}
+              style={{
+                marginTop: 10,
+                color: '#ef4444',
+                background: 'transparent',
+                border: 'none',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}
+            >
+              Wait too long? Cancel
+            </button>
           </div>
         </div>
       )}
