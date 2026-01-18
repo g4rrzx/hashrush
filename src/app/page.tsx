@@ -975,7 +975,6 @@ export default function Home() {
                 {isCorrectChain ? '🔵' : '⚠️'} {walletAddress?.slice(0, 4)}...{walletAddress?.slice(-4)}
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} className="settings-btn"><Settings size={16} /></button>
           </div>
         </div>
 
@@ -1025,14 +1024,6 @@ export default function Home() {
 
         {tab === 'mine' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="jackpot-timer">
-              <div className="jackpot-left"><h4><Gift size={14} /> Jackpot</h4><p>1 ETH Prize</p></div>
-              <div className="jackpot-countdown">
-                <div className="jackpot-time-box"><span className="jackpot-time-value">{countdown.days}</span><span className="jackpot-time-label">D</span></div>
-                <div className="jackpot-time-box"><span className="jackpot-time-value">{countdown.hours}</span><span className="jackpot-time-label">H</span></div>
-                <div className="jackpot-time-box"><span className="jackpot-time-value">{countdown.mins}</span><span className="jackpot-time-label">M</span></div>
-              </div>
-            </div>
 
             {streak >= 2 && (
               <div className="streak-banner">
@@ -1084,31 +1075,25 @@ export default function Home() {
                 <div className="balance-stat"><Coins size={14} className="text-purple-500" /><span>{inventory.tokens}</span></div>
               </div>
             </div>
-
-            <button onClick={canPlayTapGame ? () => { setTapCount(0); setTapTimeLeft(10); setTapGameActive(true); setShowTapGame(true); } : undefined} disabled={!canPlayTapGame} className="card w-full flex items-center gap-4" style={{ background: canPlayTapGame ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : '#f1f5f9', border: canPlayTapGame ? '1px solid #fcd34d' : '1px solid #e2e8f0', cursor: canPlayTapGame ? 'pointer' : 'default', padding: 16 }}>
-              <div style={{ fontSize: '2rem' }}>🎮</div>
-              <div style={{ flex: 1 }}><div style={{ fontWeight: 700, color: canPlayTapGame ? '#92400e' : '#94a3b8' }}>Daily Tap Game</div></div>
-              {canPlayTapGame && <Target size={20} className="text-yellow-600" />}
-            </button>
           </div>
         )}
 
         {tab === 'store' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <button onClick={handleSpin} className="btn-primary" style={{ marginBottom: 20 }}>🎰 Spin Wheel - 0.001 ETH</button>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>Hardware</h2>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>💻 Hardware Store</h2>
             {HARDWARE_ITEMS.map(item => (
-              <div key={item.id} className="card" style={{ padding: 16 }}>
+              <div key={item.id} className="card" style={{ padding: 16, marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <span style={{ fontSize: '1.5rem' }}>{item.icon}</span>
                     <div><div style={{ fontWeight: 700 }}>{item.name}</div><div style={{ fontSize: '0.75rem', color: '#22c55e' }}>+{item.boost} MH/s</div></div>
                   </div>
-                  <button onClick={() => handleBuy(item)} style={{ padding: '10px 16px', borderRadius: 10, background: '#2563eb', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}>{item.price} Ξ</button>
+                  <button onClick={() => handleBuy(item)} style={{ padding: '10px 16px', borderRadius: 10, background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}>{item.price} Ξ</button>
                 </div>
               </div>
             ))}
-            <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: 16, marginBottom: 10 }}>Redeem ({balance.toLocaleString()} HP)</h3>
+
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: 24, marginBottom: 16 }}>💵 Redeem USDC ({balance.toLocaleString()} HP available)</h3>
 
             {/* USDC Redeem Card Centered */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
@@ -1152,11 +1137,6 @@ export default function Home() {
                   {balance >= MIN_HP_REDEEM ? (parseFloat(contractPoolBalance) >= USDC_REWARD ? '✨ Ready to Claim' : '⚠️ Pool Empty') : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`}
                 </div>
               </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button onClick={() => handleRedeem('ticket', 1000)} className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer' }}><Ticket size={24} className="text-yellow-500" style={{ margin: '0 auto 8px' }} /><div style={{ fontWeight: 700 }}>1 Ticket</div><div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>1,000 HP</div></button>
-              <button onClick={() => handleRedeem('token', 5000)} className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer' }}><Coins size={24} className="text-purple-500" style={{ margin: '0 auto 8px' }} /><div style={{ fontWeight: 700 }}>1 $RUSH</div><div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>5,000 HP</div></button>
             </div>
           </div>
         )}
