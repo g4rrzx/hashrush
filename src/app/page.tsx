@@ -89,6 +89,7 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showAddFavorite, setShowAddFavorite] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [points, setPoints] = useState(0);
   const [balance, setBalance] = useState(0);
@@ -490,6 +491,11 @@ export default function Home() {
         setShowOnboarding(true);
       }
       setIsLoading(false);
+
+      // Show Add to Favorites prompt on first visit
+      if (!localStorage.getItem('hr_added_favorite')) {
+        setTimeout(() => setShowAddFavorite(true), 2000);
+      }
     }, 1000);
   }, []);
 
@@ -554,6 +560,30 @@ export default function Home() {
     } catch {
       if (process.env.NODE_ENV === 'development') setNotificationsEnabled(true);
     }
+  };
+
+  // Add to Farcaster Favorites
+  const handleAddToFavorites = async () => {
+    haptic('medium');
+    try {
+      const result = await sdk.actions.addFrame();
+      if (result) {
+        localStorage.setItem('hr_added_favorite', 'true');
+        setShowAddFavorite(false);
+        showToast('⭐', 'Added to Favorites!');
+        triggerConfetti();
+      }
+    } catch (error) {
+      console.error('Add to favorites error:', error);
+      // Still mark as shown so we don't keep prompting
+      localStorage.setItem('hr_added_favorite', 'true');
+      setShowAddFavorite(false);
+    }
+  };
+
+  const dismissAddFavorite = () => {
+    localStorage.setItem('hr_added_favorite', 'true');
+    setShowAddFavorite(false);
   };
 
   const handleClaimPoints = async () => {
@@ -872,6 +902,69 @@ export default function Home() {
         <div className="toast">
           <span style={{ fontSize: '1.5rem' }}>{toast.icon}</span>
           <span style={{ fontWeight: 600 }}>{toast.text}</span>
+        </div>
+      )}
+
+      {/* Add to Favorites Prompt */}
+      {showAddFavorite && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-6 animate-in fade-in">
+          <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-slate-700 relative animate-in zoom-in duration-300">
+            <div style={{
+              width: 80,
+              height: 80,
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              borderRadius: '50%',
+              margin: '0 auto 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2.5rem',
+              boxShadow: '0 10px 40px rgba(59, 130, 246, 0.4)'
+            }}>
+              ⭐
+            </div>
+
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', marginBottom: 8 }}>
+              Add to Favorites
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 24, lineHeight: 1.6 }}>
+              Add HashRush to your Farcaster favorites for quick access and notifications!
+            </p>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={dismissAddFavorite}
+                style={{
+                  flex: 1,
+                  padding: '14px 20px',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 16,
+                  color: '#94a3b8',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Later
+              </button>
+              <button
+                onClick={handleAddToFavorites}
+                style={{
+                  flex: 2,
+                  padding: '14px 20px',
+                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  border: 'none',
+                  borderRadius: 16,
+                  color: 'white',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)'
+                }}
+              >
+                ⭐ Add Now
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
