@@ -691,6 +691,8 @@ export default function Home() {
 
   // Redeem USDC from smart contract
   const handleRedeemUSDC = async () => {
+    console.log("handleRedeemUSDC called", { balance, MIN_HP_REDEEM, isTransacting, walletConnected });
+
     if (balance < MIN_HP_REDEEM || isTransacting) {
       showToast('❌', `Need ${MIN_HP_REDEEM} HP minimum`);
       return;
@@ -725,15 +727,25 @@ export default function Home() {
       const iface = new ethers.Interface(CONTRACT_ABI);
       const data = iface.encodeFunctionData("redeemUsdc", [BigInt(balance)]);
 
+      console.log("Calling redeemUsdc with balance:", balance);
+
       // Call contract directly via SDK provider
+      const txParams = {
+        to: CONTRACT_ADDRESS as `0x${string}`,
+        from: walletAddress as `0x${string}`,
+        data: data as `0x${string}`,
+        value: "0x0" as `0x${string}`,
+        chainId: "0x2105" as `0x${string}`
+      };
+
+      console.log("TX Params:", txParams);
+
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
-        params: [{
-          to: CONTRACT_ADDRESS as `0x${string}`, // Already checks validity
-          data: data as `0x${string}`,
-          value: "0x0" // No ETH sent, only gas paid
-        }]
+        params: [txParams]
       });
+
+      console.log("TX Result:", tx);
 
       if (tx) {
         // Success
