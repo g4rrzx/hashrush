@@ -860,78 +860,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Spin Modal */}
-      {showSpinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => !spinning && setShowSpinModal(false)}>
-          <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-slate-700 relative" onClick={(e) => e.stopPropagation()}>
-
-            {!spinning && !spinResult && (
-              <button
-                onClick={() => setShowSpinModal(false)}
-                className="absolute top-4 right-4 w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-white text-lg transition"
-              >
-                ×
-              </button>
-            )}
-
-            <h2 className="text-2xl font-black mb-2 text-white">🎰 Lucky Spin</h2>
-            <p className="text-slate-400 text-sm mb-4">Spin to win amazing rewards!</p>
-
-            <div style={{ position: 'relative', width: 260, height: 260, margin: '0 auto 20px' }}>
-              <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', fontSize: '2rem', zIndex: 10, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>▼</div>
-              <div className={`spin-modal-wheel ${spinning ? 'spinning' : ''}`} style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '50%',
-                position: 'relative',
-                overflow: 'hidden',
-                boxShadow: '0 0 60px rgba(59, 130, 246, 0.3), inset 0 0 0 8px rgba(255,255,255,0.1)',
-                transition: 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)',
-                border: '4px solid rgba(255,255,255,0.2)'
-              }}>
-                {SPIN_REWARDS.map((reward, i) => (
-                  <div key={i} className="wheel-segment" style={{ transform: `rotate(${i * 45}deg)`, background: reward.color }}>
-                    <div className="wheel-segment-content">
-                      <span className="wheel-segment-icon" style={{ fontSize: '1.5rem', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{reward.icon}</span>
-                      <span className="wheel-segment-label" style={{ fontSize: '0.6rem', fontWeight: 700 }}>{reward.label}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 60, height: 60, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', boxShadow: '0 4px 20px rgba(59, 130, 246, 0.5)', zIndex: 5, border: '3px solid white' }}>🎯</div>
-            </div>
-
-            {spinResult ? (
-              <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-2xl p-6 border border-yellow-500/30">
-                <div style={{ fontSize: '3rem', marginBottom: 8 }}>{spinResult.icon}</div>
-                <div className="text-2xl font-black text-white mb-2">{spinResult.label}</div>
-                <div className="text-slate-300 text-sm mb-4">
-                  {spinResult.type === 'points' && '⚡ Added to your HP balance!'}
-                  {spinResult.type === 'ticket' && '🎫 Lottery ticket added!'}
-                  {spinResult.type === 'boost' && '🚀 Mining speed boosted!'}
-                </div>
-                <button className="btn-primary w-full" onClick={() => setShowSpinModal(false)}>🎉 Awesome!</button>
-              </div>
-            ) : spinning ? (
-              <div className="text-yellow-400 font-bold animate-pulse text-lg">🎲 Spinning...</div>
-            ) : (
-              <div>
-                <div className="bg-slate-700/50 rounded-xl p-3 mb-4">
-                  <div className="text-slate-400 text-xs mb-1">Spin Cost</div>
-                  <div className="text-white font-bold">0.00001 ETH</div>
-                </div>
-                <button
-                  onClick={handleSpin}
-                  disabled={isTransacting}
-                  className="btn-primary w-full py-4 text-lg"
-                >
-                  {isTransacting ? '⏳ Waiting...' : '🎰 SPIN NOW!'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Spin Modal Removed */}
 
       {/* Hardware Collection */}
       {showHardware && (
@@ -994,84 +923,7 @@ export default function Home() {
         </div>
       )}
 
-      {showTapGame && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 overflow-hidden">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-
-          <div className="relative bg-white dark:bg-slate-900 rounded-[32px] p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(59,130,246,0.3)] animate-in zoom-in duration-300">
-            {/* Game Header */}
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Target size={18} className="text-blue-500" />
-                </div>
-                <span className="font-bold dark:text-white">Daily Rush</span>
-              </div>
-              <div className={`px-3 py-1 rounded-full text-sm font-bold ${tapTimeLeft < 4 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-blue-100 text-blue-600'}`}>
-                {tapTimeLeft}s left
-              </div>
-            </div>
-
-            {tapGameActive ? (
-              <>
-                <div className="mb-8">
-                  <div className="text-sm text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider font-bold">Current Combo</div>
-                  <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-blue-400 to-blue-600 drop-shadow-sm">
-                    {tapCount}
-                  </div>
-                </div>
-
-                {/* Big Animated Tap Button */}
-                <div className="relative py-12">
-                  <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full" />
-                  <button
-                    onPointerDown={(e) => {
-                      haptic('medium');
-                      setTapCount(c => c + 1);
-                      // Add temporary scale effect via style if needed, or rely on active:scale
-                    }}
-                    className="relative w-40 h-40 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_15px_35px_-5px_rgba(59,130,246,0.5)] flex items-center justify-center active:scale-90 active:shadow-inner transition-transform duration-75 group ring-8 ring-blue-500/10"
-                  >
-                    <div className="w-32 h-32 rounded-full border-2 border-white/20 flex items-center justify-center">
-                      <Zap size={48} className="text-white fill-white group-active:scale-125 transition-transform" />
-                    </div>
-                  </button>
-                </div>
-
-                <p className="mt-6 text-slate-400 text-sm font-medium">Tap as fast as you can!</p>
-              </>
-            ) : (
-              <div className="py-6 animate-in fade-in zoom-in duration-500">
-                <div className="w-20 h-20 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                  <Sparkles size={40} className="text-green-500" />
-                </div>
-                <h2 className="text-2xl font-black mb-1 dark:text-white">Game Over!</h2>
-                <p className="text-slate-500 dark:text-slate-400 mb-6">Great tapping speed!</p>
-
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-6 mb-8 border border-slate-100 dark:border-slate-700/50">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs text-slate-400 uppercase font-bold mb-1">Total Taps</div>
-                      <div className="text-2xl font-black dark:text-white">{tapCount}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-400 uppercase font-bold mb-1">Earned</div>
-                      <div className="text-2xl font-black text-blue-500">+{Math.floor(tapCount * 0.5)} HP</div>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowTapGame(false)}
-                  className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-bold hover:opacity-90 transition-opacity"
-                >
-                  Collect Reward
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Tap Game Removed */}
 
       {showOnboarding && (
         <div className="onboarding-overlay">
@@ -1332,12 +1184,21 @@ export default function Home() {
             </div>
 
             <div className="flex justify-between items-center mt-8 mb-4">
-              <h3 className="text-lg font-black dark:text-white">Leaderboard</h3>
+              <h3 className="text-lg font-black dark:text-white flex items-center gap-2">
+                <Trophy size={20} className="text-yellow-500" />
+                Leaderboard
+              </h3>
               <button
-                onClick={() => { haptic('medium'); fetchLeaderboard(); showToast('🔄', 'Ranking refreshed!'); }}
-                className="text-blue-500 text-sm font-bold flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-full"
+                onClick={() => {
+                  haptic('medium');
+                  fetchLeaderboard();
+                  syncScore();
+                  showToast('🔄', 'Leaderboard updated!');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 active:scale-95 transition-all"
               >
-                <RotateCw size={14} /> Refresh
+                <RotateCw size={16} className="animate-spin-slow" />
+                Refresh
               </button>
             </div>
 
