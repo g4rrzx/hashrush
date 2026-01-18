@@ -120,14 +120,15 @@ export default function Home() {
         body: JSON.stringify({
           fid: context.user.fid,
           username: context.user.username,
-          score: Math.floor(totalEarned),
-          tier: getTier(totalEarned).name
+          score: Math.floor(totalEarned + balance),
+          tier: getTier(totalEarned + balance).name
         })
       });
+      console.log('Score synced:', totalEarned + balance);
     } catch (e) {
       console.error('Score sync failed', e);
     }
-  }, [context, totalEarned]);
+  }, [context, totalEarned, balance]);
 
   // Fetch Leaderboard
   const fetchLeaderboard = async () => {
@@ -136,11 +137,28 @@ export default function Home() {
       const data = await res.json();
       if (Array.isArray(data)) {
         setLeaderboardData(data);
+        console.log('Leaderboard loaded:', data.length, 'players');
       }
     } catch (e) {
       console.error('Leaderboard fetch failed', e);
     }
   };
+
+  // Auto sync on app load and periodically
+  useEffect(() => {
+    if (isLoading || !context?.user?.fid) return;
+
+    // Sync immediately on load
+    syncScore();
+    fetchLeaderboard();
+
+    // Sync every 30 seconds
+    const interval = setInterval(() => {
+      syncScore();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isLoading, context, syncScore]);
 
   useEffect(() => {
     if (tab === 'rank') {
