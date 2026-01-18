@@ -1326,54 +1326,60 @@ export default function Home() {
               </div>
             )}
 
-            {/* Rest of Leaderboard */}
+            {/* Rest of Leaderboard - Show ALL if less than 3 players */}
             <div style={{ background: '#f8fafc', borderRadius: 16, padding: 12 }}>
-              {leaderboardData.slice(3).map((user, i) => (
-                <div key={i} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 8px',
-                  borderBottom: i < leaderboardData.length - 4 ? '1px solid #e2e8f0' : 'none'
-                }}>
-                  <div style={{
-                    width: 28,
-                    height: 28,
-                    background: '#e2e8f0',
-                    borderRadius: 8,
+              {(leaderboardData.length < 3 ? leaderboardData : leaderboardData.slice(3)).map((user, i) => {
+                const rank = leaderboardData.length < 3 ? i + 1 : i + 4;
+                return (
+                  <div key={i} style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    color: '#64748b'
+                    gap: 12,
+                    padding: '12px 8px',
+                    borderBottom: '1px solid #e2e8f0',
+                    background: rank === 1 ? '#fef3c7' : rank === 2 ? '#f1f5f9' : rank === 3 ? '#fed7aa' : 'transparent',
+                    borderRadius: rank <= 3 ? 12 : 0,
+                    marginBottom: rank <= 3 ? 8 : 0
                   }}>
-                    {i + 4}
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      background: rank === 1 ? '#f59e0b' : rank === 2 ? '#94a3b8' : rank === 3 ? '#ea580c' : '#e2e8f0',
+                      borderRadius: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.85rem',
+                      fontWeight: 900,
+                      color: rank <= 3 ? 'white' : '#64748b'
+                    }}>
+                      {rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
+                    </div>
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      background: rank <= 3 ? '#fcd34d' : '#cbd5e1',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      color: '#475569'
+                    }}>
+                      {user.name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>@{user.name}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{user.tier}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 900, fontSize: '1rem', color: rank === 1 ? '#d97706' : '#2563eb' }}>{user.score?.toLocaleString() || 0}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>HP</div>
+                    </div>
                   </div>
-                  <div style={{
-                    width: 32,
-                    height: 32,
-                    background: '#cbd5e1',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    color: '#475569'
-                  }}>
-                    {user.name?.[0]?.toUpperCase() || '?'}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b' }}>@{user.name}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{user.tier}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#2563eb' }}>{user.score.toLocaleString()}</div>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>HP</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {leaderboardData.length === 0 && (
                 <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
