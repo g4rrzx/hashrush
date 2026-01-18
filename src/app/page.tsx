@@ -21,14 +21,14 @@ const CONTRACT_ABI = [
 type Tab = 'mine' | 'store' | 'rank' | 'profile';
 
 const SPIN_REWARDS = [
-  { label: "+50 HP", value: 50, type: 'points', icon: '⚡', color: '#3b82f6' },
-  { label: "+1 Ticket", value: 1, type: 'ticket', icon: '🎫', color: '#f59e0b' },
-  { label: "+100 HP", value: 100, type: 'points', icon: '⚡', color: '#8b5cf6' },
-  { label: "+10 MH/s", value: 10, type: 'boost', icon: '🚀', color: '#22c55e' },
-  { label: "+200 HP", value: 200, type: 'points', icon: '⚡', color: '#06b6d4' },
-  { label: "+2 Tickets", value: 2, type: 'ticket', icon: '🎫', color: '#ec4899' },
-  { label: "+500 HP", value: 500, type: 'points', icon: '💎', color: '#6366f1' },
-  { label: "+50 MH/s", value: 50, type: 'boost', icon: '🔥', color: '#ef4444' },
+  { label: "+50 HP", value: 50, type: 'points', icon: '✨', color: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
+  { label: "+1 Ticket", value: 1, type: 'ticket', icon: '🎫', color: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+  { label: "+100 HP", value: 100, type: 'points', icon: '⚡', color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' },
+  { label: "+10 MH/s", value: 10, type: 'boost', icon: '🚀', color: 'linear-gradient(135deg, #22c55e, #16a34a)' },
+  { label: "+200 HP", value: 200, type: 'points', icon: '💎', color: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
+  { label: "+2 Tickets", value: 2, type: 'ticket', icon: '🎟️', color: 'linear-gradient(135deg, #ec4899, #db2777)' },
+  { label: "+500 HP", value: 500, type: 'points', icon: '👑', color: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
+  { label: "+50 MH/s", value: 50, type: 'boost', icon: '🔥', color: 'linear-gradient(135deg, #ef4444, #dc2626)' },
 ];
 
 const BADGES = [
@@ -178,6 +178,8 @@ export default function Home() {
   const [canPlayTapGame, setCanPlayTapGame] = useState(false); // Default false, set true after load check
   const [contractPoolBalance, setContractPoolBalance] = useState<string>('0');
   const [userCooldown, setUserCooldown] = useState<number>(0);
+  const [referralCount, setReferralCount] = useState<number>(0);
+  const [referralList, setReferralList] = useState<string[]>([]);
 
   const pointsRef = useRef(points);
   const prevBadgesRef = useRef<string[]>([]);
@@ -338,8 +340,35 @@ export default function Home() {
       localStorage.setItem('hr_ref_claimed', 'true');
       haptic('heavy');
       triggerConfetti();
+
+      // Notify API to give bonus to inviter too
+      fetch('/api/referral', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inviterFid: ref,
+          inviteeFid: context?.user?.fid,
+          inviteeUsername: context?.user?.username
+        })
+      }).catch(console.error);
     }
   }, [isLoading, context]);
+
+  // Fetch referral stats
+  useEffect(() => {
+    const fetchReferralStats = async () => {
+      if (!context?.user?.fid) return;
+      try {
+        const res = await fetch(`/api/referral?fid=${context.user.fid}`);
+        const data = await res.json();
+        if (data.count) setReferralCount(data.count);
+        if (data.referrals) setReferralList(data.referrals);
+      } catch (e) {
+        console.error('Referral stats failed', e);
+      }
+    };
+    if (tab === 'profile') fetchReferralStats();
+  }, [tab, context]);
 
   const getReferralLink = () => {
     const fid = context?.user?.fid || '0';
@@ -743,7 +772,7 @@ export default function Home() {
     setShowSpinModal(true);
 
     try {
-      const fee = ethers.parseEther("0.001");
+      const fee = ethers.parseEther("0.00001");
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [{
@@ -758,6 +787,7 @@ export default function Home() {
     } catch (error) {
       console.error('Spin error:', error);
       showToast('❌', 'Spin Failed');
+      setShowSpinModal(false);
     } finally {
       setIsTransacting(false);
     }
@@ -832,36 +862,72 @@ export default function Home() {
 
       {/* Spin Modal */}
       {showSpinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
-            <h2 className="text-xl font-bold mb-4">🎰 Lucky Spin</h2>
-            <div style={{ position: 'relative', width: 240, height: 240, margin: '0 auto 20px' }}>
-              <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', fontSize: '1.75rem', zIndex: 10 }}>▼</div>
-              <div className={`spin-modal-wheel ${spinning ? 'spinning' : ''}`} style={{ width: '100%', height: '100%', borderRadius: '50%', position: 'relative', overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.25), inset 0 0 0 6px white', transition: 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => !spinning && setShowSpinModal(false)}>
+          <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-slate-700 relative" onClick={(e) => e.stopPropagation()}>
+
+            {!spinning && !spinResult && (
+              <button
+                onClick={() => setShowSpinModal(false)}
+                className="absolute top-4 right-4 w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-white text-lg transition"
+              >
+                ×
+              </button>
+            )}
+
+            <h2 className="text-2xl font-black mb-2 text-white">🎰 Lucky Spin</h2>
+            <p className="text-slate-400 text-sm mb-4">Spin to win amazing rewards!</p>
+
+            <div style={{ position: 'relative', width: 260, height: 260, margin: '0 auto 20px' }}>
+              <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', fontSize: '2rem', zIndex: 10, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>▼</div>
+              <div className={`spin-modal-wheel ${spinning ? 'spinning' : ''}`} style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: '0 0 60px rgba(59, 130, 246, 0.3), inset 0 0 0 8px rgba(255,255,255,0.1)',
+                transition: 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)',
+                border: '4px solid rgba(255,255,255,0.2)'
+              }}>
                 {SPIN_REWARDS.map((reward, i) => (
                   <div key={i} className="wheel-segment" style={{ transform: `rotate(${i * 45}deg)`, background: reward.color }}>
                     <div className="wheel-segment-content">
-                      <span className="wheel-segment-icon">{reward.icon}</span>
-                      <span className="wheel-segment-label">{reward.label}</span>
+                      <span className="wheel-segment-icon" style={{ fontSize: '1.5rem', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{reward.icon}</span>
+                      <span className="wheel-segment-label" style={{ fontSize: '0.6rem', fontWeight: 700 }}>{reward.label}</span>
                     </div>
                   </div>
                 ))}
               </div>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 50, height: 50, background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 5 }}>🎯</div>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 60, height: 60, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', boxShadow: '0 4px 20px rgba(59, 130, 246, 0.5)', zIndex: 5, border: '3px solid white' }}>🎯</div>
             </div>
+
             {spinResult ? (
-              <div className="spin-result-card">
-                <div className="spin-result-icon">{spinResult.icon}</div>
-                <div className="spin-result-label" style={{ color: spinResult.color }}>{spinResult.label}</div>
-                <div className="spin-result-desc">
-                  {spinResult.type === 'points' && 'Added to your balance!'}
-                  {spinResult.type === 'ticket' && 'Lottery ticket added!'}
-                  {spinResult.type === 'boost' && 'Mining speed boosted!'}
+              <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-2xl p-6 border border-yellow-500/30">
+                <div style={{ fontSize: '3rem', marginBottom: 8 }}>{spinResult.icon}</div>
+                <div className="text-2xl font-black text-white mb-2">{spinResult.label}</div>
+                <div className="text-slate-300 text-sm mb-4">
+                  {spinResult.type === 'points' && '⚡ Added to your HP balance!'}
+                  {spinResult.type === 'ticket' && '🎫 Lottery ticket added!'}
+                  {spinResult.type === 'boost' && '🚀 Mining speed boosted!'}
                 </div>
-                <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => setShowSpinModal(false)}>Awesome!</button>
+                <button className="btn-primary w-full" onClick={() => setShowSpinModal(false)}>🎉 Awesome!</button>
               </div>
+            ) : spinning ? (
+              <div className="text-yellow-400 font-bold animate-pulse text-lg">🎲 Spinning...</div>
             ) : (
-              <p className="text-gray-500" style={{ marginTop: 8 }}>🎲 Spinning the wheel...</p>
+              <div>
+                <div className="bg-slate-700/50 rounded-xl p-3 mb-4">
+                  <div className="text-slate-400 text-xs mb-1">Spin Cost</div>
+                  <div className="text-white font-bold">0.00001 ETH</div>
+                </div>
+                <button
+                  onClick={handleSpin}
+                  disabled={isTransacting}
+                  className="btn-primary w-full py-4 text-lg"
+                >
+                  {isTransacting ? '⏳ Waiting...' : '🎰 SPIN NOW!'}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1395,9 +1461,15 @@ export default function Home() {
             <div className="card" style={{ marginTop: 16, padding: 20, textAlign: 'left' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <div style={{ background: '#eff6ff', padding: 8, borderRadius: 10 }}><UserPlus size={20} className="text-blue-500" /></div>
-                <h3 style={{ fontWeight: 800 }}>Referral System</h3>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontWeight: 800 }}>Referral System</h3>
+                  <p style={{ fontSize: '0.7rem', color: '#64748b' }}>Both you and your friend get 500 HP!</p>
+                </div>
+                <div style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: 'white', padding: '8px 16px', borderRadius: 12, textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{referralCount}</div>
+                  <div style={{ fontSize: '0.6rem', opacity: 0.9 }}>Invited</div>
+                </div>
               </div>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 16 }}>Invite friends to earn 500 HP bonus for both of you!</p>
 
               <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 12, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <code style={{ fontSize: '0.75rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 10 }}>
@@ -1407,6 +1479,13 @@ export default function Home() {
                   <Copy size={14} /> Copy
                 </button>
               </div>
+
+              {referralCount > 0 && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: 12, marginBottom: 16 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#166534', marginBottom: 8 }}>🎉 Earned from referrals: +{referralCount * 500} HP</div>
+                  <div style={{ fontSize: '0.65rem', color: '#15803d' }}>{referralList.length > 0 ? `Recent: ${referralList.slice(0, 3).join(', ')}${referralList.length > 3 ? '...' : ''}` : 'Loading...'}</div>
+                </div>
+              )}
 
               <button
                 onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🎮 Come play HashRush with me! Mine crypto and earn USDC rewards. 🚀\n\nUse my link for a 500 HP starter bonus!`)}&embeds[]=${encodeURIComponent(getReferralLink())}`)}
