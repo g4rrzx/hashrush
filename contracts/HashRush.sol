@@ -14,11 +14,11 @@ contract HashRush is Ownable, ReentrancyGuard {
     // USDC on Base Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
     IERC20 public immutable usdcToken;
     
-    // Reward amount: 0.01 USDC = 10000 (USDC has 6 decimals)
-    uint256 public rewardAmount = 10000; // 0.01 USDC
+    // Reward amount: 0.1 USDC = 10000 (USDC has 6 decimals)
+    uint256 public rewardAmount = 1000; // 0.1 USDC
     
     // Minimum HP required to redeem
-    uint256 public minHpRequired = 5000;
+    uint256 public minHpRequired = 1000;
     
     // Cooldown between redeems (1 day)
     uint256 public redeemCooldown = 1 days;
