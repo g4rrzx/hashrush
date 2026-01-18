@@ -12,10 +12,12 @@ const MIN_HP_REDEEM = 1000;
 
 const CONTRACT_ABI = [
   "function redeem(uint256 hpAmount) external",
+  "function buyHardware(string itemId) external payable",
   "function canRedeem(address user) external view returns (bool, string memory)",
   "function getRemainingCooldown(address user) external view returns (uint256)",
   "function getPoolBalance() external view returns (uint256)",
-  "function rewardAmount() external view returns (uint256)"
+  "function rewardAmount() external view returns (uint256)",
+  "function getHardwarePrice(string itemId) external view returns (uint256)"
 ];
 
 type Tab = 'mine' | 'store' | 'rank' | 'profile';
@@ -556,57 +558,23 @@ export default function Home() {
   const handleClaimPoints = async () => {
     if (points < 1 || isTransacting) return;
 
-    if (!walletConnected) {
-      await connectWallet();
-      return;
-    }
-
-    if (!isCorrectChain) {
-      await switchToBase();
-      if (!isCorrectChain) {
-        showToast('⚠️', 'Switch to Base Mainnet');
-        return;
-      }
-    }
-
+    // No wallet/chain check needed - just local claim
     setIsTransacting(true);
     haptic('medium');
 
     try {
-      const value = ethers.parseEther("0.00001");
-
-      console.log("Sending Claim TX");
-
-      // Transaction parameters details for wallet visibility
-      const txParams = {
-        to: OWNER_ADDRESS as `0x${string}`,
-        from: walletAddress as `0x${string}`,
-        value: ("0x" + value.toString(16)) as `0x${string}`,
-        data: "0x" as `0x${string}`, // Empty data for ETH transfer
-        chainId: "0x2105" as `0x${string}` // Base Mainnet
-      };
-
-      console.log("TX Params:", txParams);
-
-      const tx = await sdk.wallet.ethProvider.request({
-        method: "eth_sendTransaction",
-        params: [txParams]
-      });
-
-      if (tx) {
-        // Success Logic...
-        const claimed = Math.floor(points);
-        setBalance(b => b + claimed);
-        setTotalEarned(t => t + claimed);
-        setPoints(0);
-        pointsRef.current = 0;
-        setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
-        if (soundEnabled) playKaching();
-        showToast('💰', `Claimed ${claimed} HP!`);
-      }
+      // Simply move points to balance - no blockchain transaction
+      const claimed = Math.floor(points);
+      setBalance(b => b + claimed);
+      setTotalEarned(t => t + claimed);
+      setPoints(0);
+      pointsRef.current = 0;
+      setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
+      if (soundEnabled) playKaching();
+      showToast('💰', `Claimed ${claimed} HP!`);
     } catch (error: any) {
       console.error('Claim error:', error);
-      showToast('❌', 'Transaction Failed');
+      showToast('❌', 'Claim Failed');
     } finally {
       setIsTransacting(false);
     }
@@ -632,13 +600,19 @@ export default function Home() {
     try {
       const cost = ethers.parseEther(item.price);
 
+      // Encode buyHardware function call
+      const iface = new ethers.Interface(CONTRACT_ABI);
+      const data = iface.encodeFunctionData("buyHardware", [item.id]);
+
       const txParams = {
-        to: OWNER_ADDRESS as `0x${string}`,
+        to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
         value: ("0x" + cost.toString(16)) as `0x${string}`,
-        data: "0x" as `0x${string}`,
+        data: data as `0x${string}`,
         chainId: "0x2105" as `0x${string}`
       };
+
+      console.log("Buy Hardware TX:", txParams);
 
       const tx = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
