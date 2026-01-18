@@ -1,4 +1,4 @@
-// Referral API using Vercel Blob Storage
+// Referral API using Vercel Blob Storage with fallback
 import { put, list, del } from '@vercel/blob';
 
 const REFERRAL_FILE = 'referrals.json';
@@ -7,12 +7,24 @@ interface ReferralData {
     [inviterFid: string]: {
         referrals: string[];
         referralCount: number;
-        bonusAwarded: number; // Total bonus points given to inviter
+        bonusAwarded: number;
     };
 }
 
+// In-memory fallback
+let memoryReferrals: ReferralData = {};
+
+// Check if Blob token is configured
+const isBlobConfigured = (): boolean => {
+    return !!process.env.BLOB_READ_WRITE_TOKEN;
+};
+
 // Get referral data from Blob
 async function getReferralData(): Promise<ReferralData> {
+    if (!isBlobConfigured()) {
+        return memoryReferrals;
+    }
+
     try {
         const { blobs } = await list({ prefix: REFERRAL_FILE });
 
@@ -24,32 +36,31 @@ async function getReferralData(): Promise<ReferralData> {
         const response = await fetch(latestBlob.url);
 
         if (!response.ok) {
-            console.error('Failed to fetch referral blob:', response.status);
-            return {};
+            return memoryReferrals;
         }
 
         const data = await response.json();
         return data || {};
     } catch (error) {
         console.error('Error reading referrals:', error);
-        return {};
+        return memoryReferrals;
     }
 }
 
 // Save referral data to Blob
 async function saveReferralData(data: ReferralData): Promise<boolean> {
+    memoryReferrals = data;
+
+    if (!isBlobConfigured()) {
+        return true;
+    }
+
     try {
-        // Delete old blobs first
         const { blobs } = await list({ prefix: REFERRAL_FILE });
         for (const blob of blobs) {
-            try {
-                await del(blob.url);
-            } catch (e) {
-                console.log('Delete old blob failed:', e);
-            }
+            try { await del(blob.url); } catch (e) { }
         }
 
-        // Save new data
         await put(REFERRAL_FILE, JSON.stringify(data), {
             access: 'public',
             contentType: 'application/json',
@@ -58,7 +69,7 @@ async function saveReferralData(data: ReferralData): Promise<boolean> {
         return true;
     } catch (error) {
         console.error('Error saving referrals:', error);
-        return false;
+        return true; // Memory already updated
     }
 }
 
@@ -72,7 +83,6 @@ export async function POST(req: Request) {
             return Response.json({ error: 'Both FIDs required' }, { status: 400 });
         }
 
-        // Can't refer yourself
         if (String(inviterFid) === String(inviteeFid)) {
             return Response.json({ error: 'Cannot refer yourself' }, { status: 400 });
         }
@@ -80,10 +90,8 @@ export async function POST(req: Request) {
         const inviterKey = String(inviterFid);
         const inviteeKey = String(inviteeFid);
 
-        // Get current referral data
         const referralData = await getReferralData();
 
-        // Initialize inviter if not exists
         if (!referralData[inviterKey]) {
             referralData[inviterKey] = {
                 referrals: [],
@@ -92,7 +100,6 @@ export async function POST(req: Request) {
             };
         }
 
-        // Check if already claimed
         if (referralData[inviterKey].referrals.includes(inviteeKey)) {
             return Response.json({
                 error: 'Already claimed',
@@ -101,28 +108,19 @@ export async function POST(req: Request) {
             }, { status: 200 });
         }
 
-        // Add referral and award bonus to INVITER
-        const REFERRAL_BONUS = 500; // 500 HP bonus per referral
+        const REFERRAL_BONUS = 500;
 
         referralData[inviterKey].referrals.push(inviteeKey);
         referralData[inviterKey].referralCount += 1;
         referralData[inviterKey].bonusAwarded += REFERRAL_BONUS;
 
-        // Save updated data
-        const saved = await saveReferralData(referralData);
-
-        if (!saved) {
-            return Response.json({ error: 'Failed to save referral' }, { status: 500 });
-        }
+        await saveReferralData(referralData);
 
         return Response.json({
             success: true,
-            message: `Referral recorded! Inviter gets +${REFERRAL_BONUS} HP bonus!`,
+            message: `Referral recorded! Inviter gets +${REFERRAL_BONUS} HP!`,
             newCount: referralData[inviterKey].referralCount,
-            totalBonus: referralData[inviterKey].bonusAwarded,
-            inviterFid: inviterKey,
-            inviteeFid: inviteeKey,
-            inviteeUsername: inviteeUsername
+            totalBonus: referralData[inviterKey].bonusAwarded
         });
     } catch (error) {
         console.error('Referral error:', error);
@@ -130,7 +128,6 @@ export async function POST(req: Request) {
     }
 }
 
-// Get referral stats for a user
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);

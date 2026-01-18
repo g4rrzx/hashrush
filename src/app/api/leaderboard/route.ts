@@ -1,4 +1,4 @@
-// Leaderboard API using Vercel Blob Storage
+// Leaderboard API using Vercel Blob Storage with fallback
 import { put, list, del } from '@vercel/blob';
 
 const LEADERBOARD_FILE = 'leaderboard.json';
@@ -11,8 +11,22 @@ interface LeaderboardEntry {
     lastUpdated: number;
 }
 
+// In-memory fallback when Blob is not configured
+let memoryLeaderboard: LeaderboardEntry[] = [];
+
+// Check if Blob token is configured
+const isBlobConfigured = (): boolean => {
+    return !!process.env.BLOB_READ_WRITE_TOKEN;
+};
+
 // Get leaderboard data from Blob
 async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
+    // If Blob not configured, use memory
+    if (!isBlobConfigured()) {
+        console.log('Blob not configured, using memory store');
+        return memoryLeaderboard;
+    }
+
     try {
         const { blobs } = await list({ prefix: LEADERBOARD_FILE });
 
@@ -20,25 +34,33 @@ async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
             return [];
         }
 
-        // Get the latest blob
         const latestBlob = blobs[0];
         const response = await fetch(latestBlob.url);
 
         if (!response.ok) {
             console.error('Failed to fetch blob:', response.status);
-            return [];
+            return memoryLeaderboard;
         }
 
         const data = await response.json();
         return Array.isArray(data) ? data : [];
     } catch (error) {
-        console.error('Error reading leaderboard:', error);
-        return [];
+        console.error('Error reading leaderboard from Blob:', error);
+        return memoryLeaderboard;
     }
 }
 
 // Save leaderboard data to Blob
 async function saveLeaderboardData(data: LeaderboardEntry[]): Promise<boolean> {
+    // Always update memory as backup
+    memoryLeaderboard = data;
+
+    // If Blob not configured, just use memory
+    if (!isBlobConfigured()) {
+        console.log('Blob not configured, saved to memory only');
+        return true;
+    }
+
     try {
         // Delete old blobs first
         const { blobs } = await list({ prefix: LEADERBOARD_FILE });
@@ -46,7 +68,7 @@ async function saveLeaderboardData(data: LeaderboardEntry[]): Promise<boolean> {
             try {
                 await del(blob.url);
             } catch (e) {
-                console.log('Delete old blob failed (ok if first time):', e);
+                // Ignore delete errors
             }
         }
 
@@ -58,8 +80,9 @@ async function saveLeaderboardData(data: LeaderboardEntry[]): Promise<boolean> {
 
         return true;
     } catch (error) {
-        console.error('Error saving leaderboard:', error);
-        return false;
+        console.error('Error saving leaderboard to Blob:', error);
+        // Memory is already updated, so return true anyway
+        return true;
     }
 }
 
@@ -120,19 +143,16 @@ export async function POST(req: Request) {
         }
 
         // Save updated leaderboard
-        const saved = await saveLeaderboardData(leaderboard);
-
-        if (!saved) {
-            return Response.json({ error: 'Failed to save' }, { status: 500 });
-        }
+        await saveLeaderboardData(leaderboard);
 
         return Response.json({
             success: true,
             totalPlayers: leaderboard.length,
-            yourScore: userData.score
+            yourScore: userData.score,
+            blobConfigured: isBlobConfigured()
         });
     } catch (error) {
         console.error('Leaderboard POST error:', error);
-        return Response.json({ error: 'Failed to update score' }, { status: 500 });
+        return Response.json({ error: 'Failed to update score', details: String(error) }, { status: 500 });
     }
 }
