@@ -710,13 +710,7 @@ export default function Home() {
       }
     }
 
-    // Check Pool Balance
-    if (parseFloat(contractPoolBalance) < USDC_REWARD) {
-      showToast('⚠️', 'Reward Pool Empty - Try again later');
-      return;
-    }
-
-    // Check Cooldown
+    // Check Cooldown (optional - contract will also check)
     if (userCooldown > 0) {
       const hrs = Math.ceil(userCooldown / 3600);
       showToast('⏳', `Cooldown active: Wait ${hrs}h`);
@@ -1132,8 +1126,7 @@ export default function Home() {
                   <DollarSign size={32} />
                 </div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{USDC_REWARD} USDC</h3>
-                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
-                <p style={{ fontSize: '0.7rem', color: '#cbd5e1', marginBottom: 12 }}>Pool: {contractPoolBalance} USDC</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 12 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
 
                 <div style={{
                   background: balance >= MIN_HP_REDEEM ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
@@ -1143,7 +1136,7 @@ export default function Home() {
                   fontSize: '0.85rem',
                   fontWeight: 700
                 }}>
-                  {balance >= MIN_HP_REDEEM ? (parseFloat(contractPoolBalance) >= USDC_REWARD ? '✨ Ready to Claim' : '⚠️ Pool Empty') : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`}
+                  {balance >= MIN_HP_REDEEM ? '✨ Ready to Claim' : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`}
                 </div>
               </button>
             </div>
