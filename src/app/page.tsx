@@ -7,8 +7,8 @@ import { ethers } from "ethers";
 
 const OWNER_ADDRESS = "0xe0E8222404BFb2Bf10B3A38A758b0Cff0336cd5B"; // Checksummed Verified
 const CONTRACT_ADDRESS = "0x3F65f80F006E5B2f74a4ED2D830dBec260A331B8";
-const USDC_REWARD = 0.01; // 0.01 USDC per redeem
-const MIN_HP_REDEEM = 5000;
+const USDC_REWARD = 0.1; // 0.01 USDC per redeem
+const MIN_HP_REDEEM = 1000;
 
 const CONTRACT_ABI = [
   "function redeem(uint256 hpAmount) external",
