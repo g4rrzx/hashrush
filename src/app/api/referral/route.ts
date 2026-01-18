@@ -7,6 +7,7 @@ interface ReferralData {
     [inviterFid: string]: {
         referrals: string[];
         referralCount: number;
+        bonusAwarded: number; // Total bonus points given to inviter
     };
 }
 
@@ -21,8 +22,14 @@ async function getReferralData(): Promise<ReferralData> {
 
         const latestBlob = blobs[0];
         const response = await fetch(latestBlob.url);
+
+        if (!response.ok) {
+            console.error('Failed to fetch referral blob:', response.status);
+            return {};
+        }
+
         const data = await response.json();
-        return data as ReferralData;
+        return data || {};
     } catch (error) {
         console.error('Error reading referrals:', error);
         return {};
@@ -30,12 +37,16 @@ async function getReferralData(): Promise<ReferralData> {
 }
 
 // Save referral data to Blob
-async function saveReferralData(data: ReferralData): Promise<void> {
+async function saveReferralData(data: ReferralData): Promise<boolean> {
     try {
         // Delete old blobs first
         const { blobs } = await list({ prefix: REFERRAL_FILE });
         for (const blob of blobs) {
-            await del(blob.url);
+            try {
+                await del(blob.url);
+            } catch (e) {
+                console.log('Delete old blob failed:', e);
+            }
         }
 
         // Save new data
@@ -43,13 +54,15 @@ async function saveReferralData(data: ReferralData): Promise<void> {
             access: 'public',
             contentType: 'application/json',
         });
+
+        return true;
     } catch (error) {
         console.error('Error saving referrals:', error);
-        throw error;
+        return false;
     }
 }
 
-// Track referrals and give bonus to both parties
+// Track referrals and give bonus to inviter
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -57,6 +70,11 @@ export async function POST(req: Request) {
 
         if (!inviterFid || !inviteeFid) {
             return Response.json({ error: 'Both FIDs required' }, { status: 400 });
+        }
+
+        // Can't refer yourself
+        if (String(inviterFid) === String(inviteeFid)) {
+            return Response.json({ error: 'Cannot refer yourself' }, { status: 400 });
         }
 
         const inviterKey = String(inviterFid);
@@ -69,7 +87,8 @@ export async function POST(req: Request) {
         if (!referralData[inviterKey]) {
             referralData[inviterKey] = {
                 referrals: [],
-                referralCount: 0
+                referralCount: 0,
+                bonusAwarded: 0
             };
         }
 
@@ -77,21 +96,33 @@ export async function POST(req: Request) {
         if (referralData[inviterKey].referrals.includes(inviteeKey)) {
             return Response.json({
                 error: 'Already claimed',
-                alreadyClaimed: true
+                alreadyClaimed: true,
+                currentCount: referralData[inviterKey].referralCount
             }, { status: 200 });
         }
 
-        // Add referral
+        // Add referral and award bonus to INVITER
+        const REFERRAL_BONUS = 500; // 500 HP bonus per referral
+
         referralData[inviterKey].referrals.push(inviteeKey);
         referralData[inviterKey].referralCount += 1;
+        referralData[inviterKey].bonusAwarded += REFERRAL_BONUS;
 
         // Save updated data
-        await saveReferralData(referralData);
+        const saved = await saveReferralData(referralData);
+
+        if (!saved) {
+            return Response.json({ error: 'Failed to save referral' }, { status: 500 });
+        }
 
         return Response.json({
             success: true,
-            message: 'Referral bonus applied!',
-            newCount: referralData[inviterKey].referralCount
+            message: `Referral recorded! Inviter gets +${REFERRAL_BONUS} HP bonus!`,
+            newCount: referralData[inviterKey].referralCount,
+            totalBonus: referralData[inviterKey].bonusAwarded,
+            inviterFid: inviterKey,
+            inviteeFid: inviteeKey,
+            inviteeUsername: inviteeUsername
         });
     } catch (error) {
         console.error('Referral error:', error);
@@ -114,10 +145,11 @@ export async function GET(req: Request) {
 
         return Response.json({
             count: userReferrals?.referralCount || 0,
-            referrals: userReferrals?.referrals || []
+            referrals: userReferrals?.referrals || [],
+            bonusAwarded: userReferrals?.bonusAwarded || 0
         });
     } catch (error) {
         console.error('Get referrals error:', error);
-        return Response.json({ count: 0, referrals: [] }, { status: 200 });
+        return Response.json({ count: 0, referrals: [], bonusAwarded: 0 });
     }
 }

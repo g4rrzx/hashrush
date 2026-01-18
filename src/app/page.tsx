@@ -376,21 +376,42 @@ export default function Home() {
     }
   }, [isLoading, context]);
 
-  // Fetch referral stats
+  // Fetch referral stats and apply bonus for inviter
   useEffect(() => {
     const fetchReferralStats = async () => {
       if (!context?.user?.fid) return;
       try {
         const res = await fetch(`/api/referral?fid=${context.user.fid}`);
         const data = await res.json();
-        if (data.count) setReferralCount(data.count);
+
+        if (data.count !== undefined) setReferralCount(data.count);
         if (data.referrals) setReferralList(data.referrals);
+
+        // Apply referral bonus to inviter if they haven't received it yet
+        const lastBonusApplied = parseInt(localStorage.getItem('hr_ref_bonus_applied') || '0');
+        const currentBonus = data.bonusAwarded || 0;
+
+        if (currentBonus > lastBonusApplied) {
+          const newBonus = currentBonus - lastBonusApplied;
+          setBalance(b => b + newBonus);
+          setTotalEarned(t => t + newBonus);
+          localStorage.setItem('hr_ref_bonus_applied', String(currentBonus));
+
+          if (newBonus > 0) {
+            showToast('🎁', `Referral Bonus: +${newBonus} HP!`);
+            haptic('heavy');
+          }
+        }
       } catch (e) {
         console.error('Referral stats failed', e);
       }
     };
-    if (tab === 'profile') fetchReferralStats();
-  }, [tab, context]);
+
+    // Fetch on profile tab AND on initial load
+    if (!isLoading && context?.user?.fid) {
+      fetchReferralStats();
+    }
+  }, [tab, context, isLoading]);
 
   const getReferralLink = () => {
     const fid = context?.user?.fid || '0';
@@ -488,8 +509,7 @@ export default function Home() {
             setTimeout(() => setShowTapGame(true), 1500); // Auto popup daily game
           }
 
-          if (gain > 50) { setOfflineGain(gain); setShowWelcome(true); }
-
+          // Offline gain applied silently (no popup)
           setPoints(data.points + gain);
           pointsRef.current = data.points + gain;
           setBalance(data.balance || 0);
@@ -936,16 +956,7 @@ export default function Home() {
 
       {/* Settings modal moved to after main - see line 1470+ */}
 
-      {showWelcome && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center"><Zap size={40} className="text-white" /></div>
-            <h2 className="text-2xl font-bold mb-2">Welcome Back!</h2>
-            <div className="bg-blue-50 rounded-2xl p-6 mb-6"><div className="text-4xl font-black text-blue-600">+{offlineGain.toFixed(0)}</div><div className="text-sm text-blue-500">Offline HP</div></div>
-            <button onClick={() => { haptic('medium'); if (soundEnabled) playKaching(); setShowWelcome(false); }} className="btn-primary">Collect</button>
-          </div>
-        </div>
-      )}
+      {/* Welcome popup removed - offline gains applied silently */}
 
       {/* Tap Game Removed */}
 
@@ -1186,37 +1197,16 @@ export default function Home() {
               <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Next Tier at {(userTier.name === 'Bronze' ? 1000 : userTier.name === 'Silver' ? 10000 : 50000).toLocaleString()} HP</p>
             </div>
 
-            {/* Leaderboard Header */}
+            {/* Leaderboard Header - Auto sync enabled */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 20 }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Trophy size={22} className="text-yellow-500" />
                 Top 100 Players
               </h3>
-              <button
-                onClick={async () => {
-                  haptic('medium');
-                  await syncScore();
-                  await fetchLeaderboard();
-                  showToast('🔄', 'Updated!');
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
-                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 10,
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-                }}
-              >
-                <RotateCw size={14} />
-                Sync
-              </button>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <RotateCw size={12} />
+                Auto-sync
+              </div>
             </div>
 
             {/* Top 3 Podium */}

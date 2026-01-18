@@ -23,8 +23,14 @@ async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
         // Get the latest blob
         const latestBlob = blobs[0];
         const response = await fetch(latestBlob.url);
+
+        if (!response.ok) {
+            console.error('Failed to fetch blob:', response.status);
+            return [];
+        }
+
         const data = await response.json();
-        return data as LeaderboardEntry[];
+        return Array.isArray(data) ? data : [];
     } catch (error) {
         console.error('Error reading leaderboard:', error);
         return [];
@@ -32,12 +38,16 @@ async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
 }
 
 // Save leaderboard data to Blob
-async function saveLeaderboardData(data: LeaderboardEntry[]): Promise<void> {
+async function saveLeaderboardData(data: LeaderboardEntry[]): Promise<boolean> {
     try {
         // Delete old blobs first
         const { blobs } = await list({ prefix: LEADERBOARD_FILE });
         for (const blob of blobs) {
-            await del(blob.url);
+            try {
+                await del(blob.url);
+            } catch (e) {
+                console.log('Delete old blob failed (ok if first time):', e);
+            }
         }
 
         // Save new data
@@ -45,9 +55,11 @@ async function saveLeaderboardData(data: LeaderboardEntry[]): Promise<void> {
             access: 'public',
             contentType: 'application/json',
         });
+
+        return true;
     } catch (error) {
         console.error('Error saving leaderboard:', error);
-        throw error;
+        return false;
     }
 }
 
@@ -63,7 +75,7 @@ export async function GET() {
         return Response.json(sorted);
     } catch (error) {
         console.error('Leaderboard GET error:', error);
-        return Response.json([], { status: 200 });
+        return Response.json([]);
     }
 }
 
@@ -77,25 +89,27 @@ export async function POST(req: Request) {
         }
 
         // Get current leaderboard
-        const leaderboard = await getLeaderboardData();
+        let leaderboard = await getLeaderboardData();
 
         // Find existing user or create new
-        const existingIndex = leaderboard.findIndex(u => u.fid === String(fid));
+        const fidStr = String(fid);
+        const existingIndex = leaderboard.findIndex(u => String(u.fid) === fidStr);
 
         const userData: LeaderboardEntry = {
-            fid: String(fid),
+            fid: fidStr,
             name: username || `user_${fid}`,
-            score: score || 0,
+            score: Number(score) || 0,
             tier: tier || 'Bronze',
             lastUpdated: Date.now()
         };
 
         if (existingIndex >= 0) {
-            // Update existing user (keep higher score)
-            if (score > leaderboard[existingIndex].score) {
+            // Update existing user - always update with higher score
+            const currentScore = leaderboard[existingIndex].score || 0;
+            if (Number(score) >= currentScore) {
                 leaderboard[existingIndex] = userData;
             } else {
-                // Update other fields but keep score
+                // Just update name/tier/time
                 leaderboard[existingIndex].name = userData.name;
                 leaderboard[existingIndex].tier = userData.tier;
                 leaderboard[existingIndex].lastUpdated = userData.lastUpdated;
@@ -106,9 +120,17 @@ export async function POST(req: Request) {
         }
 
         // Save updated leaderboard
-        await saveLeaderboardData(leaderboard);
+        const saved = await saveLeaderboardData(leaderboard);
 
-        return Response.json({ success: true, totalPlayers: leaderboard.length });
+        if (!saved) {
+            return Response.json({ error: 'Failed to save' }, { status: 500 });
+        }
+
+        return Response.json({
+            success: true,
+            totalPlayers: leaderboard.length,
+            yourScore: userData.score
+        });
     } catch (error) {
         console.error('Leaderboard POST error:', error);
         return Response.json({ error: 'Failed to update score' }, { status: 500 });
