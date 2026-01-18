@@ -981,42 +981,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Settings / Welcome / TapGame modals... (same as before, abbreviated) */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="text-gray-400 text-xl">✕</button>
-            </div>
-            <div className="settings-item">
-              <div className="settings-label">
-                <div className="settings-icon" style={{ background: darkMode ? '#312e81' : '#fef3c7' }}>
-                  {darkMode ? <Moon size={20} className="text-indigo-400" /> : <Sun size={20} className="text-yellow-500" />}
-                </div>
-                <div><div style={{ fontWeight: 600 }}>Dark Mode</div></div>
-              </div>
-              <div className={`toggle-switch ${darkMode ? 'active' : ''}`} onClick={() => setDarkMode(!darkMode)} />
-            </div>
-            <div className="settings-item">
-              <div className="settings-label">
-                <div className="settings-icon" style={{ background: '#dcfce7' }}><Sparkles size={20} className="text-green-500" /></div>
-                <div><div style={{ fontWeight: 600 }}>Sound Effects</div></div>
-              </div>
-              <div className={`toggle-switch ${soundEnabled ? 'active' : ''}`} onClick={() => setSoundEnabled(!soundEnabled)} />
-            </div>
-            <div className="settings-item">
-              <div className="settings-label">
-                <div className="settings-icon" style={{ background: notificationsEnabled ? '#dbeafe' : '#f1f5f9' }}>
-                  {notificationsEnabled ? <Bell size={20} className="text-blue-500" /> : <BellOff size={20} className="text-gray-400" />}
-                </div>
-                <div><div style={{ fontWeight: 600 }}>Notifications</div></div>
-              </div>
-              <div className={`toggle-switch ${notificationsEnabled ? 'active' : ''}`} onClick={notificationsEnabled ? () => setNotificationsEnabled(false) : enableNotifications} />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Settings modal moved to after main - see line 1470+ */}
 
       {showWelcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
@@ -1246,47 +1211,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Daily Tap Game Modal */}
-            {showTapGame && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-300">
-                <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-blue-500 relative overflow-hidden">
-
-                  <button
-                    onClick={() => setShowTapGame(false)}
-                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  >
-                    <span style={{ fontSize: '1.5rem' }}>×</span>
-                  </button>
-
-                  {!tapGameActive ? (
-                    <div className="animate-in zoom-in duration-300">
-                      <div className="text-4xl mb-2">⚡</div>
-                      <h2 className="text-2xl font-black mb-2 text-blue-600 dark:text-blue-400 uppercase italic">Daily Surge!</h2>
-                      <p className="text-slate-600 dark:text-slate-300 mb-6">Tap as fast as you can in 10 seconds to generate extra power!</p>
-                      <button
-                        onClick={() => { setTapGameActive(true); setTapTimeLeft(10); setTapCount(0); haptic('heavy'); }}
-                        className="btn-primary w-full text-lg py-4 shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform"
-                      >
-                        START SURGE
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-6xl font-black mb-4 text-blue-500 tabular-nums">{tapTimeLeft}s</div>
-                      <div className="text-sm uppercase tracking-widest text-slate-400 mb-8 font-bold">Time Remaining</div>
-
-                      <button
-                        onClick={() => { setTapCount(c => c + 1); haptic('light'); playKaching(); }}
-                        className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-[0_0_40px_rgba(59,130,246,0.6)] active:scale-90 transition-all flex items-center justify-center mx-auto border-4 border-white dark:border-slate-800"
-                      >
-                        <div className="text-white font-black text-5xl pointer-events-none drop-shadow-md">{tapCount}</div>
-                      </button>
-                      <p className="mt-6 text-slate-500 animate-pulse font-bold">TAP FAST!</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Daily Tap Game button removed - modal is now outside main */}
 
             <div className="action-grid">
               <button onClick={handleClaimPoints} className="action-btn" style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #93c5fd' }}>
