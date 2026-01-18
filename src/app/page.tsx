@@ -492,9 +492,17 @@ export default function Home() {
       }
       setIsLoading(false);
 
-      // Show Add to Favorites prompt on first visit
+      // Auto add to Farcaster Favorites on first visit
       if (!localStorage.getItem('hr_added_favorite')) {
-        setTimeout(() => setShowAddFavorite(true), 2000);
+        setTimeout(async () => {
+          try {
+            await sdk.actions.addFrame();
+            localStorage.setItem('hr_added_favorite', 'true');
+          } catch (e) {
+            console.log('Add to favorites skipped:', e);
+            localStorage.setItem('hr_added_favorite', 'true');
+          }
+        }, 1500);
       }
     }, 1000);
   }, []);
@@ -905,118 +913,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Add to Favorites Prompt */}
-      {showAddFavorite && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-6 animate-in fade-in">
-          <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-slate-700 relative animate-in zoom-in duration-300">
-            <div style={{
-              width: 80,
-              height: 80,
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              borderRadius: '50%',
-              margin: '0 auto 20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '2.5rem',
-              boxShadow: '0 10px 40px rgba(59, 130, 246, 0.4)'
-            }}>
-              ⭐
-            </div>
 
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', marginBottom: 8 }}>
-              Add to Favorites
-            </h2>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 24, lineHeight: 1.6 }}>
-              Add HashRush to your Farcaster favorites for quick access and notifications!
-            </p>
-
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button
-                onClick={dismissAddFavorite}
-                style={{
-                  flex: 1,
-                  padding: '14px 20px',
-                  background: 'rgba(255,255,255,0.1)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 16,
-                  color: '#94a3b8',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                Later
-              </button>
-              <button
-                onClick={handleAddToFavorites}
-                style={{
-                  flex: 2,
-                  padding: '14px 20px',
-                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                  border: 'none',
-                  borderRadius: 16,
-                  color: 'white',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)'
-                }}
-              >
-                ⭐ Add Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Spin Modal Removed */}
-
-      {/* Hardware Collection */}
-      {showHardware && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl max-h-[80vh] overflow-auto">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 48, height: 48, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🖥️</div>
-                <div>
-                  <h2 style={{ fontWeight: 800, fontSize: '1.1rem' }}>My Hardware</h2>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{inventory.rigs} rigs active</p>
-                </div>
-              </div>
-              <button onClick={() => setShowHardware(false)} style={{ width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-            </div>
-            <div className="hardware-total-stats">
-              <div className="hardware-total-stat">
-                <div className="hardware-total-value">{hashRate}</div>
-                <div className="hardware-total-label">MH/s Total</div>
-              </div>
-              <div className="hardware-total-stat">
-                <div className="hardware-total-value">{inventory.rigs}</div>
-                <div className="hardware-total-label">Rigs Owned</div>
-              </div>
-            </div>
-            <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 12 }}>Your Rigs</h3>
-            {ownedHardware.map(hw => {
-              const item = HARDWARE_ITEMS.find(h => h.id === hw.id);
-              if (!item) return null;
-              return (
-                <div key={hw.id} className="hardware-card">
-                  <div className="hardware-icon">{item.icon}</div>
-                  <div className="hardware-info">
-                    <div className="hardware-name">{item.name}</div>
-                    <div className="hardware-stats">
-                      <span className="hardware-stat count">×{hw.count}</span>
-                      <span className="hardware-stat">+{hw.totalBoost} MH/s</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {ownedHardware.length === 0 && (
-              <p style={{ textAlign: 'center', color: '#94a3b8', padding: 20 }}>No hardware yet. Visit Shop!</p>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Modals removed - Hardware shown in Profile tab */}
 
       {/* Settings modal moved to after main - see line 1470+ */}
 
@@ -1369,10 +1267,61 @@ export default function Home() {
               </button>
             </div>
 
-            <button onClick={() => setShowHardware(true)} className="btn-secondary" style={{ marginTop: 16, marginBottom: 16 }}><Package size={18} /> View Hardware</button>
+            {/* My Hardware Section */}
+            <div className="card" style={{ marginTop: 16, padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <div style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', padding: 8, borderRadius: 10 }}>
+                  <Cpu size={20} className="text-white" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontWeight: 800 }}>My Hardware</h3>
+                  <p style={{ fontSize: '0.7rem', color: '#64748b' }}>{hashRate} MH/s total • {inventory.rigs} rigs</p>
+                </div>
+              </div>
+
+              {ownedHardware.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {ownedHardware.map(hw => {
+                    const item = HARDWARE_ITEMS.find(h => h.id === hw.id);
+                    if (!item) return null;
+                    return (
+                      <div key={hw.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        background: '#f8fafc',
+                        padding: 12,
+                        borderRadius: 12,
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{ fontSize: '1.5rem' }}>{item.icon}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{item.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#22c55e' }}>+{hw.totalBoost} MH/s</div>
+                        </div>
+                        <div style={{
+                          background: '#3b82f6',
+                          color: 'white',
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          fontSize: '0.75rem',
+                          fontWeight: 700
+                        }}>
+                          ×{hw.count}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>No hardware yet. Visit Shop to buy!</p>
+              )}
+            </div>
+
             <button
               onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🚀 Mining on HashRush!\n⚡ ${totalEarned.toLocaleString()} HP\n🏆 ${userTier.name} Tier`)}&embeds[]=${encodeURIComponent(getReferralLink())}`)}
               className="btn-primary"
+              style={{ marginTop: 16 }}
             >
               <Share2 size={18} /> Share Stats
             </button>
