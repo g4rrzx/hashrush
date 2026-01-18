@@ -1,57 +1,69 @@
-// Leaderboard API with fallback
-// Works with Vercel KV or in-memory fallback
+// Leaderboard API using Vercel Blob Storage
+import { put, list, del } from '@vercel/blob';
 
-let memoryStore: Map<string, any> = new Map();
+const LEADERBOARD_FILE = 'leaderboard.json';
 
-// Try to use Vercel KV, fallback to memory
-let kv: any = null;
-try {
-    const kvModule = require('@vercel/kv');
-    kv = kvModule.kv;
-} catch (e) {
-    console.log('Vercel KV not available, using memory store');
+interface LeaderboardEntry {
+    fid: string;
+    name: string;
+    score: number;
+    tier: string;
+    lastUpdated: number;
+}
+
+// Get leaderboard data from Blob
+async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
+    try {
+        const { blobs } = await list({ prefix: LEADERBOARD_FILE });
+
+        if (blobs.length === 0) {
+            return [];
+        }
+
+        // Get the latest blob
+        const latestBlob = blobs[0];
+        const response = await fetch(latestBlob.url);
+        const data = await response.json();
+        return data as LeaderboardEntry[];
+    } catch (error) {
+        console.error('Error reading leaderboard:', error);
+        return [];
+    }
+}
+
+// Save leaderboard data to Blob
+async function saveLeaderboardData(data: LeaderboardEntry[]): Promise<void> {
+    try {
+        // Delete old blobs first
+        const { blobs } = await list({ prefix: LEADERBOARD_FILE });
+        for (const blob of blobs) {
+            await del(blob.url);
+        }
+
+        // Save new data
+        await put(LEADERBOARD_FILE, JSON.stringify(data), {
+            access: 'public',
+            contentType: 'application/json',
+        });
+    } catch (error) {
+        console.error('Error saving leaderboard:', error);
+        throw error;
+    }
 }
 
 export async function GET() {
     try {
-        let leaderboard: any[] = [];
+        const leaderboard = await getLeaderboardData();
 
-        if (kv) {
-            try {
-                // Get all keys (User IDs)
-                const keys = await kv.keys('user:*');
+        // Sort by score descending
+        const sorted = leaderboard
+            .sort((a, b) => (b.score || 0) - (a.score || 0))
+            .slice(0, 100);
 
-                // Fetch data for all users
-                const users = await Promise.all(
-                    keys.map(async (key: string) => {
-                        const data = await kv.hgetall(key);
-                        return data ? { ...data, fid: key.split(':')[1] } : null;
-                    })
-                );
-
-                // Filter valid users and sort by score (desc)
-                leaderboard = users
-                    .filter((u): u is any => u !== null)
-                    .sort((a, b) => (b.score || 0) - (a.score || 0))
-                    .slice(0, 100);
-            } catch (kvError) {
-                console.error('KV error, using memory:', kvError);
-                // Fall through to memory store
-                leaderboard = Array.from(memoryStore.values())
-                    .sort((a, b) => (b.score || 0) - (a.score || 0))
-                    .slice(0, 100);
-            }
-        } else {
-            // Use memory store
-            leaderboard = Array.from(memoryStore.values())
-                .sort((a, b) => (b.score || 0) - (a.score || 0))
-                .slice(0, 100);
-        }
-
-        return Response.json(leaderboard);
+        return Response.json(sorted);
     } catch (error) {
         console.error('Leaderboard GET error:', error);
-        return Response.json([], { status: 200 }); // Return empty array instead of error
+        return Response.json([], { status: 200 });
     }
 }
 
@@ -60,29 +72,43 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { fid, username, score, tier } = body;
 
-        if (!fid) return Response.json({ error: 'FID required' }, { status: 400 });
+        if (!fid) {
+            return Response.json({ error: 'FID required' }, { status: 400 });
+        }
 
-        const userData = {
+        // Get current leaderboard
+        const leaderboard = await getLeaderboardData();
+
+        // Find existing user or create new
+        const existingIndex = leaderboard.findIndex(u => u.fid === String(fid));
+
+        const userData: LeaderboardEntry = {
+            fid: String(fid),
             name: username || `user_${fid}`,
             score: score || 0,
             tier: tier || 'Bronze',
             lastUpdated: Date.now()
         };
 
-        if (kv) {
-            try {
-                // Store user data in KV
-                await kv.hset(`user:${fid}`, userData);
-            } catch (kvError) {
-                console.error('KV write error, using memory:', kvError);
-                memoryStore.set(fid, userData);
+        if (existingIndex >= 0) {
+            // Update existing user (keep higher score)
+            if (score > leaderboard[existingIndex].score) {
+                leaderboard[existingIndex] = userData;
+            } else {
+                // Update other fields but keep score
+                leaderboard[existingIndex].name = userData.name;
+                leaderboard[existingIndex].tier = userData.tier;
+                leaderboard[existingIndex].lastUpdated = userData.lastUpdated;
             }
         } else {
-            // Use memory store
-            memoryStore.set(fid, userData);
+            // Add new user
+            leaderboard.push(userData);
         }
 
-        return Response.json({ success: true });
+        // Save updated leaderboard
+        await saveLeaderboardData(leaderboard);
+
+        return Response.json({ success: true, totalPlayers: leaderboard.length });
     } catch (error) {
         console.error('Leaderboard POST error:', error);
         return Response.json({ error: 'Failed to update score' }, { status: 500 });

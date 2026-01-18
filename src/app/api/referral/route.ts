@@ -1,16 +1,52 @@
-// Referral API with fallback
-// Works with Vercel KV or in-memory fallback
+// Referral API using Vercel Blob Storage
+import { put, list, del } from '@vercel/blob';
 
-let referralStore: Map<string, Set<string>> = new Map();
-let userStore: Map<string, any> = new Map();
+const REFERRAL_FILE = 'referrals.json';
 
-// Try to use Vercel KV, fallback to memory
-let kv: any = null;
-try {
-    const kvModule = require('@vercel/kv');
-    kv = kvModule.kv;
-} catch (e) {
-    console.log('Vercel KV not available, using memory store');
+interface ReferralData {
+    [inviterFid: string]: {
+        referrals: string[];
+        referralCount: number;
+    };
+}
+
+// Get referral data from Blob
+async function getReferralData(): Promise<ReferralData> {
+    try {
+        const { blobs } = await list({ prefix: REFERRAL_FILE });
+
+        if (blobs.length === 0) {
+            return {};
+        }
+
+        const latestBlob = blobs[0];
+        const response = await fetch(latestBlob.url);
+        const data = await response.json();
+        return data as ReferralData;
+    } catch (error) {
+        console.error('Error reading referrals:', error);
+        return {};
+    }
+}
+
+// Save referral data to Blob
+async function saveReferralData(data: ReferralData): Promise<void> {
+    try {
+        // Delete old blobs first
+        const { blobs } = await list({ prefix: REFERRAL_FILE });
+        for (const blob of blobs) {
+            await del(blob.url);
+        }
+
+        // Save new data
+        await put(REFERRAL_FILE, JSON.stringify(data), {
+            access: 'public',
+            contentType: 'application/json',
+        });
+    } catch (error) {
+        console.error('Error saving referrals:', error);
+        throw error;
+    }
 }
 
 // Track referrals and give bonus to both parties
@@ -23,69 +59,44 @@ export async function POST(req: Request) {
             return Response.json({ error: 'Both FIDs required' }, { status: 400 });
         }
 
-        if (kv) {
-            try {
-                // Check if this invitee already claimed referral
-                const alreadyClaimed = await kv.sismember(`referrals:${inviterFid}:list`, inviteeFid);
-                if (alreadyClaimed) {
-                    return Response.json({ error: 'Already claimed', alreadyClaimed: true }, { status: 200 });
-                }
+        const inviterKey = String(inviterFid);
+        const inviteeKey = String(inviteeFid);
 
-                // Add to inviter's referral list
-                await kv.sadd(`referrals:${inviterFid}:list`, inviteeFid);
+        // Get current referral data
+        const referralData = await getReferralData();
 
-                // Increment inviter's referral count
-                await kv.hincrby(`user:${inviterFid}`, 'referralCount', 1);
-                await kv.hincrby(`user:${inviterFid}`, 'score', 500); // Bonus for inviter
-
-                // Track invitee info
-                await kv.hset(`referral:${inviteeFid}`, {
-                    invitedBy: inviterFid,
-                    username: inviteeUsername,
-                    claimedAt: Date.now()
-                });
-            } catch (kvError) {
-                console.error('KV error, using memory:', kvError);
-                // Fallback to memory
-                handleMemoryReferral(inviterFid, inviteeFid, inviteeUsername);
-            }
-        } else {
-            // Use memory store
-            handleMemoryReferral(inviterFid, inviteeFid, inviteeUsername);
+        // Initialize inviter if not exists
+        if (!referralData[inviterKey]) {
+            referralData[inviterKey] = {
+                referrals: [],
+                referralCount: 0
+            };
         }
+
+        // Check if already claimed
+        if (referralData[inviterKey].referrals.includes(inviteeKey)) {
+            return Response.json({
+                error: 'Already claimed',
+                alreadyClaimed: true
+            }, { status: 200 });
+        }
+
+        // Add referral
+        referralData[inviterKey].referrals.push(inviteeKey);
+        referralData[inviterKey].referralCount += 1;
+
+        // Save updated data
+        await saveReferralData(referralData);
 
         return Response.json({
             success: true,
-            message: 'Referral bonus applied to both!'
+            message: 'Referral bonus applied!',
+            newCount: referralData[inviterKey].referralCount
         });
     } catch (error) {
         console.error('Referral error:', error);
         return Response.json({ error: 'Referral failed' }, { status: 500 });
     }
-}
-
-function handleMemoryReferral(inviterFid: string, inviteeFid: string, inviteeUsername: string) {
-    // Get or create referral set
-    if (!referralStore.has(inviterFid)) {
-        referralStore.set(inviterFid, new Set());
-    }
-    const referrals = referralStore.get(inviterFid)!;
-
-    // Check if already claimed
-    if (referrals.has(inviteeFid)) {
-        return false;
-    }
-
-    // Add referral
-    referrals.add(inviteeFid);
-
-    // Update user stats
-    const userData = userStore.get(inviterFid) || { referralCount: 0, score: 0 };
-    userData.referralCount += 1;
-    userData.score += 500;
-    userStore.set(inviterFid, userData);
-
-    return true;
 }
 
 // Get referral stats for a user
@@ -98,39 +109,15 @@ export async function GET(req: Request) {
             return Response.json({ error: 'FID required' }, { status: 400 });
         }
 
-        let referralCount = 0;
-        let referralList: string[] = [];
-
-        if (kv) {
-            try {
-                // Get referral list
-                referralList = await kv.smembers(`referrals:${fid}:list`) || [];
-
-                // Get user data
-                const userData = await kv.hgetall(`user:${fid}`);
-                referralCount = userData?.referralCount || 0;
-            } catch (kvError) {
-                console.error('KV read error, using memory:', kvError);
-                // Fallback to memory
-                const referrals = referralStore.get(fid);
-                referralList = referrals ? Array.from(referrals) : [];
-                const userData = userStore.get(fid);
-                referralCount = userData?.referralCount || 0;
-            }
-        } else {
-            // Use memory store
-            const referrals = referralStore.get(fid);
-            referralList = referrals ? Array.from(referrals) : [];
-            const userData = userStore.get(fid);
-            referralCount = userData?.referralCount || 0;
-        }
+        const referralData = await getReferralData();
+        const userReferrals = referralData[String(fid)];
 
         return Response.json({
-            count: referralCount,
-            referrals: referralList
+            count: userReferrals?.referralCount || 0,
+            referrals: userReferrals?.referrals || []
         });
     } catch (error) {
         console.error('Get referrals error:', error);
-        return Response.json({ count: 0, referrals: [] }, { status: 200 }); // Return empty instead of error
+        return Response.json({ count: 0, referrals: [] }, { status: 200 });
     }
 }
