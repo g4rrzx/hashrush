@@ -334,6 +334,17 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [walletConnected, isCorrectChain, walletAddress]);
 
+  // Local cooldown countdown (tick every second for real-time display)
+  useEffect(() => {
+    if (userCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setUserCooldown(prev => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [userCooldown > 0]);
+
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
@@ -1130,45 +1141,81 @@ export default function Home() {
 
             <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: 24, marginBottom: 16 }}>💵 Redeem USDC ({balance.toLocaleString()} HP available)</h3>
 
-            {/* USDC Redeem Card Centered */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-              <button onClick={handleRedeemUSDC} disabled={balance < MIN_HP_REDEEM} className="card" style={{
-                width: '100%',
-                maxWidth: 320,
-                background: balance >= MIN_HP_REDEEM ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
-                border: 'none',
-                padding: '24px 20px',
-                borderRadius: 24,
-                cursor: balance >= MIN_HP_REDEEM ? 'pointer' : 'not-allowed',
-                color: balance >= MIN_HP_REDEEM ? 'white' : '#94a3b8',
-                boxShadow: balance >= MIN_HP_REDEEM ? '0 10px 25px -5px rgba(16, 185, 129, 0.4)' : 'none',
-                transition: 'all 0.3s ease',
+            {/* Cooldown Warning - Show if cooldown active */}
+            {userCooldown > 0 && (
+              <div style={{
+                background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+                border: '2px solid #f59e0b',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 16,
                 textAlign: 'center'
               }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+                  <Clock size={20} className="text-amber-600" />
+                  <span style={{ fontWeight: 800, color: '#92400e', fontSize: '1rem' }}>Cooldown Active</span>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#d97706', marginBottom: 4 }}>
+                  {Math.floor(userCooldown / 3600)}h {Math.floor((userCooldown % 3600) / 60)}m
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#92400e' }}>Wait until cooldown ends to redeem again</p>
+              </div>
+            )}
+
+            {/* USDC Redeem Card Centered */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+              <button
+                onClick={handleRedeemUSDC}
+                disabled={balance < MIN_HP_REDEEM || userCooldown > 0}
+                className="card"
+                style={{
+                  width: '100%',
+                  maxWidth: 320,
+                  background: userCooldown > 0
+                    ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
+                    : balance >= MIN_HP_REDEEM
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : '#f1f5f9',
+                  border: 'none',
+                  padding: '24px 20px',
+                  borderRadius: 24,
+                  cursor: balance >= MIN_HP_REDEEM && userCooldown === 0 ? 'pointer' : 'not-allowed',
+                  color: balance >= MIN_HP_REDEEM || userCooldown > 0 ? 'white' : '#94a3b8',
+                  boxShadow: balance >= MIN_HP_REDEEM && userCooldown === 0 ? '0 10px 25px -5px rgba(16, 185, 129, 0.4)' : 'none',
+                  transition: 'all 0.3s ease',
+                  textAlign: 'center',
+                  opacity: userCooldown > 0 ? 0.7 : 1
+                }}
+              >
                 <div style={{
                   width: 60,
                   height: 60,
-                  background: balance >= MIN_HP_REDEEM ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                  background: balance >= MIN_HP_REDEEM || userCooldown > 0 ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto 16px'
                 }}>
-                  <DollarSign size={32} />
+                  {userCooldown > 0 ? <Clock size={32} /> : <DollarSign size={32} />}
                 </div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{USDC_REWARD} USDC</h3>
                 <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 12 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
 
                 <div style={{
-                  background: balance >= MIN_HP_REDEEM ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                  background: balance >= MIN_HP_REDEEM || userCooldown > 0 ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
                   padding: '8px 16px',
                   borderRadius: 12,
                   display: 'inline-block',
                   fontSize: '0.85rem',
                   fontWeight: 700
                 }}>
-                  {balance >= MIN_HP_REDEEM ? '✨ Ready to Claim' : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`}
+                  {userCooldown > 0
+                    ? `⏳ ${Math.floor(userCooldown / 3600)}h ${Math.floor((userCooldown % 3600) / 60)}m remaining`
+                    : balance >= MIN_HP_REDEEM
+                      ? '✨ Ready to Claim'
+                      : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`
+                  }
                 </div>
               </button>
             </div>
