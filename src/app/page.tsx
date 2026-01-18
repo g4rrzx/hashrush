@@ -1293,50 +1293,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* Settings Modal - Popup Style */}
-      {/* Settings Modal - Popup Style */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 animate-in fade-in" onClick={() => setShowSettings(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="absolute top-4 right-4 p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-            >
-              <span className="text-xl font-bold leading-none">×</span>
-            </button>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">Settings</h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                <div className="flex items-center gap-3">
-                  {darkMode ? <Moon size={20} className="text-indigo-400" /> : <Sun size={20} className="text-orange-400" />}
-                  <span className="font-bold">Dark Mode</span>
-                </div>
-                <button onClick={() => setDarkMode(!darkMode)} className={`w-12 h-7 rounded-full transition-colors relative ${darkMode ? 'bg-indigo-500' : 'bg-slate-300'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform ${darkMode ? 'left-6' : 'left-1'}`} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                <div className="flex items-center gap-3">
-                  {soundEnabled ? <Bell size={20} className="text-emerald-500" /> : <BellOff size={20} className="text-slate-400" />}
-                  <span className="font-bold">Sound Effects</span>
-                </div>
-                <button onClick={() => setSoundEnabled(!soundEnabled)} className={`w-12 h-7 rounded-full transition-colors relative ${soundEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform ${soundEnabled ? 'left-6' : 'left-1'}`} />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-8 text-center">
-              <p className="text-xs text-slate-400">HashRush v1.2</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="nav-bar">{[{ id: 'mine', icon: Zap, label: 'Mine' }, { id: 'store', icon: ShoppingBag, label: 'Shop' }, { id: 'rank', icon: Trophy, label: 'Rank' }, { id: 'profile', icon: User, label: 'Profile' }].map(item => (<button key={item.id} onClick={() => { haptic('light'); setTab(item.id as Tab); }} className={`nav-item ${tab === item.id ? 'active' : ''}`}><item.icon size={20} /><span>{item.label}</span></button>))}</div>
     </>
   );
