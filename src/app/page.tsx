@@ -1168,53 +1168,234 @@ export default function Home() {
               <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Next Tier at {(userTier.name === 'Bronze' ? 1000 : userTier.name === 'Silver' ? 10000 : 50000).toLocaleString()} HP</p>
             </div>
 
-            <div className="flex justify-between items-center mt-8 mb-4">
-              <h3 className="text-lg font-black dark:text-white flex items-center gap-2">
-                <Trophy size={20} className="text-yellow-500" />
-                Leaderboard
+            {/* Leaderboard Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 20 }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Trophy size={22} className="text-yellow-500" />
+                Top 100 Players
               </h3>
               <button
-                onClick={() => {
+                onClick={async () => {
                   haptic('medium');
-                  fetchLeaderboard();
-                  syncScore();
-                  showToast('🔄', 'Leaderboard updated!');
+                  await syncScore();
+                  await fetchLeaderboard();
+                  showToast('🔄', 'Updated!');
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 active:scale-95 transition-all"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 14px',
+                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 10,
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                }}
               >
-                <RotateCw size={16} className="animate-spin-slow" />
-                Refresh
+                <RotateCw size={14} />
+                Sync
               </button>
             </div>
 
-            <div className="leaderboard-list">
-              {leaderboardData.map((user, i) => (
-                <div key={i} className="leaderboard-row">
-                  <div className="leaderboard-rank">{i + 1}</div>
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm">
-                      {user.name[0].toUpperCase()}
-                    </div>
-                    <div className="leaderboard-name">@{user.name}</div>
+            {/* Top 3 Podium */}
+            {leaderboardData.length >= 3 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginBottom: 24, padding: '0 10px' }}>
+                {/* 2nd Place */}
+                <div style={{
+                  flex: 1,
+                  background: 'linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%)',
+                  borderRadius: '16px 16px 0 0',
+                  padding: '16px 8px 12px',
+                  textAlign: 'center',
+                  border: '2px solid #94a3b8'
+                }}>
+                  <div style={{ fontSize: '1.8rem', marginBottom: 4 }}>🥈</div>
+                  <div style={{
+                    width: 40,
+                    height: 40,
+                    background: '#94a3b8',
+                    borderRadius: '50%',
+                    margin: '0 auto 8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 800,
+                    fontSize: '0.9rem'
+                  }}>
+                    {leaderboardData[1]?.name?.[0]?.toUpperCase() || '?'}
                   </div>
-                  <div className="text-right">
-                    <div className="leaderboard-score">{user.score.toLocaleString()} HP</div>
-                    <div className="text-[10px] opacity-60 font-bold uppercase">{user.tier}</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    @{leaderboardData[1]?.name?.slice(0, 8) || '---'}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                    {leaderboardData[1]?.score?.toLocaleString() || 0}
+                  </div>
+                </div>
+
+                {/* 1st Place */}
+                <div style={{
+                  flex: 1.2,
+                  background: 'linear-gradient(180deg, #fef3c7 0%, #fcd34d 100%)',
+                  borderRadius: '20px 20px 0 0',
+                  padding: '20px 8px 16px',
+                  textAlign: 'center',
+                  border: '3px solid #f59e0b',
+                  transform: 'translateY(-10px)',
+                  boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)'
+                }}>
+                  <div style={{ fontSize: '2.2rem', marginBottom: 4 }}>👑</div>
+                  <div style={{
+                    width: 50,
+                    height: 50,
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    borderRadius: '50%',
+                    margin: '0 auto 8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 800,
+                    fontSize: '1.1rem',
+                    border: '3px solid white'
+                  }}>
+                    {leaderboardData[0]?.name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    @{leaderboardData[0]?.name?.slice(0, 8) || '---'}
+                  </div>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#78350f' }}>
+                    {leaderboardData[0]?.score?.toLocaleString() || 0} HP
+                  </div>
+                </div>
+
+                {/* 3rd Place */}
+                <div style={{
+                  flex: 1,
+                  background: 'linear-gradient(180deg, #fed7aa 0%, #fdba74 100%)',
+                  borderRadius: '16px 16px 0 0',
+                  padding: '14px 8px 10px',
+                  textAlign: 'center',
+                  border: '2px solid #ea580c'
+                }}>
+                  <div style={{ fontSize: '1.6rem', marginBottom: 4 }}>🥉</div>
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    background: '#ea580c',
+                    borderRadius: '50%',
+                    margin: '0 auto 8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 800,
+                    fontSize: '0.85rem'
+                  }}>
+                    {leaderboardData[2]?.name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#9a3412', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    @{leaderboardData[2]?.name?.slice(0, 8) || '---'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#7c2d12' }}>
+                    {leaderboardData[2]?.score?.toLocaleString() || 0}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rest of Leaderboard */}
+            <div style={{ background: '#f8fafc', borderRadius: 16, padding: 12 }}>
+              {leaderboardData.slice(3).map((user, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 8px',
+                  borderBottom: i < leaderboardData.length - 4 ? '1px solid #e2e8f0' : 'none'
+                }}>
+                  <div style={{
+                    width: 28,
+                    height: 28,
+                    background: '#e2e8f0',
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: '#64748b'
+                  }}>
+                    {i + 4}
+                  </div>
+                  <div style={{
+                    width: 32,
+                    height: 32,
+                    background: '#cbd5e1',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#475569'
+                  }}>
+                    {user.name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b' }}>@{user.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{user.tier}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#2563eb' }}>{user.score.toLocaleString()}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>HP</div>
                   </div>
                 </div>
               ))}
-              <div className="leaderboard-row self">
-                <div className="leaderboard-rank">-</div>
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm">
-                    {context?.user?.displayName?.[0].toUpperCase() || 'U'}
-                  </div>
-                  <div className="leaderboard-name">@{context?.user?.username || 'you'} (You)</div>
+
+              {leaderboardData.length === 0 && (
+                <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                  <Trophy size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
+                  <p>No players yet. Be the first!</p>
                 </div>
-                <div className="text-right">
-                  <div className="leaderboard-score">{totalEarned.toLocaleString()} HP</div>
-                  <div className="text-[10px] opacity-60 font-bold uppercase">{userTier.name}</div>
-                </div>
+              )}
+            </div>
+
+            {/* Your Position */}
+            <div style={{
+              marginTop: 16,
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              borderRadius: 16,
+              padding: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              color: 'white'
+            }}>
+              <div style={{
+                width: 44,
+                height: 44,
+                background: 'rgba(255,255,255,0.2)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                fontSize: '1rem'
+              }}>
+                {context?.user?.displayName?.[0]?.toUpperCase() || 'U'}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>@{context?.user?.username || 'you'}</div>
+                <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{userTier.name} Tier</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 900, fontSize: '1.25rem' }}>{totalEarned.toLocaleString()}</div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>HP</div>
               </div>
             </div>
           </div>
