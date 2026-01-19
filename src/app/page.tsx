@@ -107,7 +107,7 @@ export default function Home() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isTransacting, setIsTransacting] = useState(false);
   const [lastMilestone, setLastMilestone] = useState(0);
-  const [leaderboardData, setLeaderboardData] = useState<{ name: string, score: number, tier: string }[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<{ fid: string, name: string, score: number, tier: string, pfpUrl?: string }[]>([]);
 
   // --- Real-time Leaderboard Sync ---
   const syncScore = useCallback(async () => {
@@ -121,7 +121,8 @@ export default function Home() {
           fid: context.user.fid,
           username: context.user.username,
           score: Math.floor(totalEarned + balance),
-          tier: getTier(totalEarned + balance).name
+          tier: getTier(totalEarned + balance).name,
+          pfpUrl: context.user.pfpUrl || null
         })
       });
       console.log('Score synced:', totalEarned + balance);
@@ -1251,30 +1252,54 @@ export default function Home() {
             {leaderboardData.length >= 3 && (
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginBottom: 24, padding: '0 10px' }}>
                 {/* 2nd Place */}
-                <div style={{
-                  flex: 1,
-                  background: 'linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%)',
-                  borderRadius: '16px 16px 0 0',
-                  padding: '16px 8px 12px',
-                  textAlign: 'center',
-                  border: '2px solid #94a3b8'
-                }}>
+                <div
+                  onClick={() => {
+                    if (leaderboardData[1]?.name) {
+                      haptic('light');
+                      sdk.actions.openUrl(`https://warpcast.com/${leaderboardData[1].name}`);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%)',
+                    borderRadius: '16px 16px 0 0',
+                    padding: '16px 8px 12px',
+                    textAlign: 'center',
+                    border: '2px solid #94a3b8',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div style={{ fontSize: '1.8rem', marginBottom: 4 }}>🥈</div>
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    background: '#94a3b8',
-                    borderRadius: '50%',
-                    margin: '0 auto 8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: 800,
-                    fontSize: '0.9rem'
-                  }}>
-                    {leaderboardData[1]?.name?.[0]?.toUpperCase() || '?'}
-                  </div>
+                  {leaderboardData[1]?.pfpUrl ? (
+                    <img
+                      src={leaderboardData[1].pfpUrl}
+                      alt={leaderboardData[1].name}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        margin: '0 auto 8px',
+                        border: '2px solid white'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      background: '#94a3b8',
+                      borderRadius: '50%',
+                      margin: '0 auto 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: '0.9rem'
+                    }}>
+                      {leaderboardData[1]?.name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     @{leaderboardData[1]?.name?.slice(0, 8) || '---'}
                   </div>
@@ -1284,33 +1309,57 @@ export default function Home() {
                 </div>
 
                 {/* 1st Place */}
-                <div style={{
-                  flex: 1.2,
-                  background: 'linear-gradient(180deg, #fef3c7 0%, #fcd34d 100%)',
-                  borderRadius: '20px 20px 0 0',
-                  padding: '20px 8px 16px',
-                  textAlign: 'center',
-                  border: '3px solid #f59e0b',
-                  transform: 'translateY(-10px)',
-                  boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)'
-                }}>
+                <div
+                  onClick={() => {
+                    if (leaderboardData[0]?.name) {
+                      haptic('light');
+                      sdk.actions.openUrl(`https://warpcast.com/${leaderboardData[0].name}`);
+                    }
+                  }}
+                  style={{
+                    flex: 1.2,
+                    background: 'linear-gradient(180deg, #fef3c7 0%, #fcd34d 100%)',
+                    borderRadius: '20px 20px 0 0',
+                    padding: '20px 8px 16px',
+                    textAlign: 'center',
+                    border: '3px solid #f59e0b',
+                    transform: 'translateY(-10px)',
+                    boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div style={{ fontSize: '2.2rem', marginBottom: 4 }}>👑</div>
-                  <div style={{
-                    width: 50,
-                    height: 50,
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    borderRadius: '50%',
-                    margin: '0 auto 8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: 800,
-                    fontSize: '1.1rem',
-                    border: '3px solid white'
-                  }}>
-                    {leaderboardData[0]?.name?.[0]?.toUpperCase() || '?'}
-                  </div>
+                  {leaderboardData[0]?.pfpUrl ? (
+                    <img
+                      src={leaderboardData[0].pfpUrl}
+                      alt={leaderboardData[0].name}
+                      style={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        margin: '0 auto 8px',
+                        border: '3px solid white'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: 50,
+                      height: 50,
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      borderRadius: '50%',
+                      margin: '0 auto 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: '1.1rem',
+                      border: '3px solid white'
+                    }}>
+                      {leaderboardData[0]?.name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     @{leaderboardData[0]?.name?.slice(0, 8) || '---'}
                   </div>
@@ -1320,30 +1369,54 @@ export default function Home() {
                 </div>
 
                 {/* 3rd Place */}
-                <div style={{
-                  flex: 1,
-                  background: 'linear-gradient(180deg, #fed7aa 0%, #fdba74 100%)',
-                  borderRadius: '16px 16px 0 0',
-                  padding: '14px 8px 10px',
-                  textAlign: 'center',
-                  border: '2px solid #ea580c'
-                }}>
+                <div
+                  onClick={() => {
+                    if (leaderboardData[2]?.name) {
+                      haptic('light');
+                      sdk.actions.openUrl(`https://warpcast.com/${leaderboardData[2].name}`);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(180deg, #fed7aa 0%, #fdba74 100%)',
+                    borderRadius: '16px 16px 0 0',
+                    padding: '14px 8px 10px',
+                    textAlign: 'center',
+                    border: '2px solid #ea580c',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div style={{ fontSize: '1.6rem', marginBottom: 4 }}>🥉</div>
-                  <div style={{
-                    width: 36,
-                    height: 36,
-                    background: '#ea580c',
-                    borderRadius: '50%',
-                    margin: '0 auto 8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: 800,
-                    fontSize: '0.85rem'
-                  }}>
-                    {leaderboardData[2]?.name?.[0]?.toUpperCase() || '?'}
-                  </div>
+                  {leaderboardData[2]?.pfpUrl ? (
+                    <img
+                      src={leaderboardData[2].pfpUrl}
+                      alt={leaderboardData[2].name}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        margin: '0 auto 8px',
+                        border: '2px solid white'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      background: '#ea580c',
+                      borderRadius: '50%',
+                      margin: '0 auto 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: '0.85rem'
+                    }}>
+                      {leaderboardData[2]?.name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#9a3412', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     @{leaderboardData[2]?.name?.slice(0, 8) || '---'}
                   </div>
@@ -1358,17 +1431,28 @@ export default function Home() {
             <div style={{ background: '#f8fafc', borderRadius: 16, padding: 12 }}>
               {(leaderboardData.length < 3 ? leaderboardData : leaderboardData.slice(3)).map((user, i) => {
                 const rank = leaderboardData.length < 3 ? i + 1 : i + 4;
+                const profileUrl = `https://warpcast.com/${user.name}`;
+
                 return (
-                  <div key={i} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '12px 8px',
-                    borderBottom: '1px solid #e2e8f0',
-                    background: rank === 1 ? '#fef3c7' : rank === 2 ? '#f1f5f9' : rank === 3 ? '#fed7aa' : 'transparent',
-                    borderRadius: rank <= 3 ? 12 : 0,
-                    marginBottom: rank <= 3 ? 8 : 0
-                  }}>
+                  <div
+                    key={user.fid || i}
+                    onClick={() => {
+                      haptic('light');
+                      sdk.actions.openUrl(profileUrl);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '12px 8px',
+                      borderBottom: '1px solid #e2e8f0',
+                      background: rank === 1 ? '#fef3c7' : rank === 2 ? '#f1f5f9' : rank === 3 ? '#fed7aa' : 'transparent',
+                      borderRadius: rank <= 3 ? 12 : 0,
+                      marginBottom: rank <= 3 ? 8 : 0,
+                      cursor: 'pointer',
+                      transition: 'background 0.2s ease'
+                    }}
+                  >
                     <div style={{
                       width: 32,
                       height: 32,
@@ -1383,20 +1467,37 @@ export default function Home() {
                     }}>
                       {rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
                     </div>
-                    <div style={{
-                      width: 36,
-                      height: 36,
-                      background: rank <= 3 ? '#fcd34d' : '#cbd5e1',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.9rem',
-                      fontWeight: 700,
-                      color: '#475569'
-                    }}>
-                      {user.name?.[0]?.toUpperCase() || '?'}
-                    </div>
+
+                    {/* Profile Picture */}
+                    {user.pfpUrl ? (
+                      <img
+                        src={user.pfpUrl}
+                        alt={user.name}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: rank <= 3 ? '2px solid #fcd34d' : '2px solid #e2e8f0'
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 36,
+                        height: 36,
+                        background: rank <= 3 ? '#fcd34d' : '#cbd5e1',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.9rem',
+                        fontWeight: 700,
+                        color: '#475569'
+                      }}>
+                        {user.name?.[0]?.toUpperCase() || '?'}
+                      </div>
+                    )}
+
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>@{user.name}</div>
                       <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{user.tier}</div>
