@@ -157,12 +157,13 @@ export default function Home() {
     setHasSyncedOnce(true);
   }, [isLoading, context, hasSyncedOnce]);
 
-  // Fetch leaderboard when opening rank tab (read only, no sync)
+  // Fetch leaderboard when opening rank tab, also sync to update pfpUrl
   useEffect(() => {
     if (tab === 'rank') {
+      syncScore(); // Sync to update pfpUrl in database
       fetchLeaderboard();
     }
-  }, [tab]);
+  }, [tab, syncScore]);
 
   // Sync score only when user claims/earns significant points (not periodically)
   // This will be called manually after claim actions
