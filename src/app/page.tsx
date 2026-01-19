@@ -144,36 +144,27 @@ export default function Home() {
     }
   };
 
-  // Auto sync on app load and periodically
-  useEffect(() => {
-    if (isLoading || !context?.user?.fid) return;
+  // Sync score ONCE on initial app load only
+  const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
 
-    // Sync immediately on load
+  useEffect(() => {
+    if (isLoading || !context?.user?.fid || hasSyncedOnce) return;
+
+    // Sync ONLY ONCE on first load
     syncScore();
     fetchLeaderboard();
+    setHasSyncedOnce(true);
+  }, [isLoading, context, hasSyncedOnce]);
 
-    // Sync every 30 seconds
-    const interval = setInterval(() => {
-      syncScore();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [isLoading, context, syncScore]);
-
+  // Fetch leaderboard when opening rank tab (read only, no sync)
   useEffect(() => {
     if (tab === 'rank') {
       fetchLeaderboard();
-      syncScore();
     }
-  }, [tab, syncScore]);
+  }, [tab]);
 
-  // Sync score periodically
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (totalEarned > 100) syncScore();
-    }, 60000); // Every 1 min
-    return () => clearInterval(timer);
-  }, [syncScore, totalEarned]);
+  // Sync score only when user claims/earns significant points (not periodically)
+  // This will be called manually after claim actions
   const [jackpotTime, setJackpotTime] = useState(getJackpotTime());
   const [showSpinModal, setShowSpinModal] = useState(false);
   const [spinning, setSpinning] = useState(false);
