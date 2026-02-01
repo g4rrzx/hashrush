@@ -481,6 +481,32 @@ export default function Home() {
     }
   }, [points, lastMilestone, soundEnabled]);
 
+  // --- SERVER SYNC LOGIC ---
+
+  const saveToServer = useCallback(async (data: any) => {
+    if (!context?.user?.fid) return;
+
+    try {
+      await fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fid: context.user.fid,
+          data: {
+            ...data,
+            username: context.user.username,
+            pfpUrl: context.user.pfpUrl,
+            tier: getTier(data.totalEarned).name
+          }
+        })
+      });
+      // console.log('Progress saved to server');
+    } catch (e) {
+      console.error('Save to server failed', e);
+    }
+  }, [context]);
+
+  // Load game data (Server -> Local -> New)
   useEffect(() => {
     const init = async () => {
       const ctx = await sdk.context;
@@ -488,14 +514,45 @@ export default function Home() {
       sdk.actions.ready();
     };
     if (sdk && !context) init();
+  }, [context]);
 
-    setTimeout(() => {
-      const saved = localStorage.getItem('hr_v12');
-      if (saved) {
+  // Separate effect for loading data once FID is available
+  useEffect(() => {
+    if (!context?.user?.fid || !isLoading) return;
+
+    const loadData = async () => {
+      let data: any = null;
+      let fromServer = false;
+
+      // 1. Try load from Server
+      try {
+        const res = await fetch(`/api/progress/${context.user.fid}`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          data = json.data;
+          fromServer = true;
+          console.log('Loaded from Server');
+        }
+      } catch (e) {
+        console.error('Server load failed', e);
+      }
+
+      // 2. If no server data, try LocalStorage (Migration first time)
+      if (!data) {
+        const local = localStorage.getItem('hr_v12');
+        if (local) {
+          try {
+            data = JSON.parse(local);
+            console.log('Loaded from LocalStorage (Migration)');
+          } catch (e) { console.error(e); }
+        }
+      }
+
+      // 3. Apply Data if exists
+      if (data) {
         try {
-          const data = JSON.parse(saved);
-          const elapsed = (Date.now() - data.time) / 1000;
-          const gain = (data.hashRate / 1000) * Math.min(elapsed, 86400);
+          const elapsed = (Date.now() - (data.time || Date.now())) / 1000;
+          const gain = (data.hashRate / 1000) * Math.min(elapsed, 86400 * 3); // Max 3 days offline
 
           const lastDate = new Date(data.time).toDateString();
           const today = new Date().toDateString();
@@ -510,10 +567,10 @@ export default function Home() {
             setLastTapGameDate(data.lastTapGameDate);
           } else {
             setCanPlayTapGame(true);
-            setTimeout(() => setShowTapGame(true), 1500); // Auto popup daily game
+            setTimeout(() => setShowTapGame(true), 1500);
           }
 
-          // Offline gain applied silently (no popup)
+          // Apply state
           setPoints(data.points + gain);
           pointsRef.current = data.points + gain;
           setBalance(data.balance || 0);
@@ -528,40 +585,78 @@ export default function Home() {
           setDarkMode(data.darkMode || false);
           setSoundEnabled(data.soundEnabled !== false);
           setNotificationsEnabled(data.notificationsEnabled || false);
-        } catch (e) { console.error(e); }
+
+          if (gain > 0) setOfflineGain(gain);
+
+          // If migration (local but no server), save immediately
+          if (!fromServer) {
+            saveToServer({
+              points: data.points + gain, balance: data.balance, totalEarned: data.totalEarned,
+              inventory: data.inventory, ownedHardware: data.ownedHardware, hashRate: data.hashRate,
+              streak: data.streak, badges: data.badges, lastTapGameDate: data.lastTapGameDate,
+              transactions: data.transactions, darkMode: data.darkMode, soundEnabled: data.soundEnabled,
+              time: Date.now()
+            });
+          }
+        } catch (e) { console.error('Data apply error', e); }
       } else {
         setShowOnboarding(true);
       }
+
       setIsLoading(false);
 
-      // Auto add to Farcaster Favorites on first visit
+      // Auto add favorites
       if (!localStorage.getItem('hr_added_favorite')) {
         setTimeout(async () => {
-          try {
-            await sdk.actions.addFrame();
-            localStorage.setItem('hr_added_favorite', 'true');
-          } catch (e) {
-            console.log('Add to favorites skipped:', e);
-            localStorage.setItem('hr_added_favorite', 'true');
-          }
+          try { await sdk.actions.addFrame(); localStorage.setItem('hr_added_favorite', 'true'); }
+          catch (e) { localStorage.setItem('hr_added_favorite', 'true'); }
         }, 1500);
       }
-    }, 1000);
-  }, []);
+    };
 
+    loadData();
+  }, [context, isLoading, saveToServer, sdk]);
+
+  // Auto-Save Loop (To Local & Server)
   useEffect(() => {
     if (isLoading) return;
-    const save = () => {
-      localStorage.setItem('hr_v12', JSON.stringify({
-        points: pointsRef.current, balance, totalEarned, inventory, ownedHardware, hashRate, streak,
-        badges: unlockedBadges, lastTapGameDate, transactions: transactions.slice(-20),
-        darkMode, soundEnabled, notificationsEnabled, time: Date.now()
-      }));
+
+    const saveData = {
+      points: pointsRef.current, balance, totalEarned, inventory, ownedHardware, hashRate, streak,
+      badges: unlockedBadges, lastTapGameDate, transactions: transactions.slice(-20),
+      darkMode, soundEnabled, notificationsEnabled, time: Date.now()
     };
-    const interval = setInterval(save, 5000);
-    document.addEventListener('visibilitychange', () => document.hidden && save());
-    return () => clearInterval(interval);
-  }, [isLoading, balance, totalEarned, inventory, ownedHardware, hashRate, streak, unlockedBadges, lastTapGameDate, transactions, darkMode, soundEnabled, notificationsEnabled]);
+
+    const save = () => {
+      // 1. Local Save (Fast)
+      localStorage.setItem('hr_v12', JSON.stringify(saveData));
+    };
+
+    // Save to server less frequently or if forced
+    const saveServer = () => {
+      saveToServer(saveData);
+    };
+
+    const interval = setInterval(() => {
+      save();
+      // Also save to server every 10s if active
+      if (Math.random() > 0.5) saveServer();
+    }, 5000);
+
+    // Save on close/hide
+    const handleVisibility = () => {
+      if (document.hidden) {
+        save();
+        saveServer();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isLoading, balance, totalEarned, inventory, ownedHardware, hashRate, streak, unlockedBadges, lastTapGameDate, transactions, darkMode, soundEnabled, notificationsEnabled, saveToServer]);
 
   useEffect(() => {
     if (!mining || isLoading) return;
