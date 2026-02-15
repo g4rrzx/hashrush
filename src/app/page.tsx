@@ -4,11 +4,14 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import sdk, { type Context } from "@farcaster/frame-sdk";
 import { Zap, ShoppingBag, Trophy, Power, Ticket, Coins, Cpu, Share2, Gift, Wallet, Target, User, Clock, ArrowDownToLine, Settings, Moon, Sun, Bell, BellOff, Sparkles, Package, DollarSign, RotateCw, UserPlus, Copy } from "lucide-react";
 import { ethers } from "ethers";
+import { Attribution } from "ox/erc8021";
 
 const OWNER_ADDRESS = "0xe0E8222404BFb2Bf10B3A38A758b0Cff0336cd5B"; // Checksummed Verified
 const CONTRACT_ADDRESS = "0xb2f6e89002ECE5c498029660ce0E64300A9DCd95";
 const USDC_REWARD = 0.025; // 0.01 USDC per redeem
 const MIN_HP_REDEEM = 2000;
+const BUILDER_CODE = "699162797ca07f5750bbda3d"; // REPLACE WITH YOUR CODE
+const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
 
 const CONTRACT_ABI = [
   "function claimPoints(uint256 amount) external",
@@ -761,7 +764,7 @@ export default function Home() {
         to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
         value: "0x0" as `0x${string}`, // NO ETH transfer
-        data: data as `0x${string}`,
+        data: (data + DATA_SUFFIX.slice(2)) as `0x${string}`,
         chainId: "0x2105" as `0x${string}`
       };
 
@@ -818,7 +821,7 @@ export default function Home() {
         to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
         value: ("0x" + cost.toString(16)) as `0x${string}`,
-        data: data as `0x${string}`,
+        data: (data + DATA_SUFFIX.slice(2)) as `0x${string}`,
         chainId: "0x2105" as `0x${string}`
       };
 
@@ -908,7 +911,7 @@ export default function Home() {
       const txParams = {
         to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
-        data: data as `0x${string}`,
+        data: (data + DATA_SUFFIX.slice(2)) as `0x${string}`,
         value: "0x0" as `0x${string}`,
         chainId: "0x2105" as `0x${string}`
       };
