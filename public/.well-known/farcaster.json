@@ -4,28 +4,31 @@
         "payload": "eyJkb21haW4iOiJoYXNocnVzaC52ZXJjZWwuYXBwIn0",
         "signature": "Fvrv5s3iXDp9XkVsGcDM3AOrqhW4wrruK0h7XMwaHWon6SzcjTt++XsGPYNYOXqMGl1EmUmoDjPhqtOifsbWexw="
     },
-    "frame": {
+    "miniapp": {
         "version": "1",
         "name": "HashRush",
-        "iconUrl": "https://hashrush.vercel.app/icon.png",
-        "homeUrl": "https://hashrush.vercel.app",
-        "imageUrl": "https://hashrush.vercel.app/image.png",
+        "iconUrl": "https://hashrush-verce.app/icon.png",
+        "homeUrl": "https://hashrush-verce.app",
+        "imageUrl": "https://hashrush-verce.app/image.png",
         "buttonTitle": "Start Mining",
-        "splashImageUrl": "https://hashrush.vercel.app/splash.png",
+        "splashImageUrl": "https://hashrush-verce.app/splash.png",
         "splashBackgroundColor": "#0f172a",
-        "webhookUrl": "https://hashrush.vercel.app/api/webhook",
+        "webhookUrl": "https://hashrush-verce.app/api/webhook",
         "subtitle": "Mining and USDC Rewards",
         "description": "Mine, Earn, and Win! Experience the ultimate mining simulation on Base. Build your rig, spin for prizes, and redeem HP for USDC rewards.",
-        "primaryCategory": "games",
+        "primaryCategory": "social",
         "screenshotUrls": [
-            "https://hashrush.vercel.app/screenshot1.png"
+            "https://hashrush-verce.app/screenshot1.png"
         ],
         "tags": [
             "mining",
-            "rewards",
-            "usdc",
-            "crypto"
+            "game",
+            "social",
+            "base"
         ],
-        "tagline": "Earn USDC Mining on Base"
+        "tagline": "Earn USDC Mining on Base",
+        "ogTitle": "HashRush",
+        "ogDescription": "Mine, Earn, and Win! Experience the ultimate mining simulation on Base.",
+        "ogImageUrl": "https://hashrush-verce.app/image.png"
     }
 }
