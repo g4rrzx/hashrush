@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   other: {
-    "base:app_id": "699162797ca07f5750bbda3d",
+    "base:app_id": "bc_8io601u8",
     "fc:frame": JSON.stringify({
       version: "next",
       imageUrl: "https://hashrush.vercel.app/image.png",

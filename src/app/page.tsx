@@ -10,7 +10,7 @@ const OWNER_ADDRESS = "0xe0E8222404BFb2Bf10B3A38A758b0Cff0336cd5B"; // Checksumm
 const CONTRACT_ADDRESS = "0xb2f6e89002ECE5c498029660ce0E64300A9DCd95";
 const USDC_REWARD = 0.025; // 0.01 USDC per redeem
 const MIN_HP_REDEEM = 2000;
-const BUILDER_CODE = "699162797ca07f5750bbda3d"; // REPLACE WITH YOUR CODE
+const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
 
 const CONTRACT_ABI = [
@@ -280,7 +280,7 @@ export default function Home() {
     }
   };
 
-  // Check wallet on load
+  // Check wallet on load & Auto-Connect
   useEffect(() => {
     const checkWallet = async () => {
       try {
@@ -296,13 +296,17 @@ export default function Home() {
             method: 'eth_chainId'
           }) as string;
           setIsCorrectChain(chainId === BASE_CHAIN_ID);
+        } else {
+          // Auto-connect attempt if context is ready
+          if (context) {
+            connectWallet();
+          }
         }
       } catch { }
     };
 
-    if (!isLoading) checkWallet();
-    if (!isLoading) checkWallet();
-  }, [isLoading, BASE_CHAIN_ID]);
+    if (!isLoading && context) checkWallet();
+  }, [isLoading, context, BASE_CHAIN_ID]);
 
   // Check Contract State (Pool Balance & Cooldown)
   useEffect(() => {
@@ -1097,19 +1101,26 @@ export default function Home() {
               </button>
             ) : (
               <button onClick={!isCorrectChain ? switchToBase : undefined} style={{
-                padding: '6px 12px',
-                background: isCorrectChain ? '#dcfce7' : '#fef3c7',
-                color: isCorrectChain ? '#166534' : '#92400e',
-                border: `1px solid ${isCorrectChain ? '#86efac' : '#fcd34d'}`,
-                borderRadius: 10,
-                fontSize: '0.7rem',
+                padding: '4px 12px 4px 6px',
+                background: isCorrectChain ? '#f1f5f9' : '#fef3c7',
+                color: isCorrectChain ? '#0f172a' : '#92400e',
+                border: `1px solid ${isCorrectChain ? '#e2e8f0' : '#fcd34d'}`,
+                borderRadius: 20,
+                fontSize: '0.8rem',
                 fontWeight: 600,
                 cursor: isCorrectChain ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4
+                gap: 8
               }}>
-                {isCorrectChain ? '🔵' : '⚠️'} {walletAddress?.slice(0, 4)}...{walletAddress?.slice(-4)}
+                {context?.user?.pfpUrl ? (
+                  <img src={context.user.pfpUrl} alt="Profile" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={14} className="text-white" />
+                  </div>
+                )}
+                <span>@{context?.user?.username || 'user'}</span>
               </button>
             )}
           </div>
