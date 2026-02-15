@@ -17,6 +17,7 @@ export const metadata: Metadata = {
     ],
   },
   other: {
+    "base:app_id": "699162797ca07f5750bbda3d",
     "fc:frame": JSON.stringify({
       version: "next",
       imageUrl: "https://hashrush.vercel.app/image.png",
