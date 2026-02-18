@@ -4,7 +4,7 @@
         "payload": "eyJkb21haW4iOiJoYXNocnVzaC52ZXJjZWwuYXBwIn0",
         "signature": "Fvrv5s3iXDp9XkVsGcDM3AOrqhW4wrruK0h7XMwaHWon6SzcjTt++XsGPYNYOXqMGl1EmUmoDjPhqtOifsbWexw="
     },
-    "miniapp": {
+    "frame": {
         "version": "1",
         "name": "HashRush",
         "iconUrl": "https://hashrush.vercel.app/icon.png",
@@ -14,19 +14,14 @@
         "splashImageUrl": "https://hashrush.vercel.app/splash.png",
         "splashBackgroundColor": "#0f172a",
         "webhookUrl": "https://hashrush.vercel.app/api/webhook",
-        "subtitle": "Mining and USDC Rewards",
-        "description": "Mine, Earn, and Win! Experience the ultimate mining simulation on Base. Build your rig, spin for prizes, and redeem HP for USDC rewards.",
-        "primaryCategory": "social",
-        "screenshotUrls": [
-            "https://hashrush.vercel.app/screenshot1.png"
-        ],
+        "subtitle": "Mine and Earn DEGEN",
+        "description": "Mine, Earn, and Win! Build your rig, spin for prizes, and redeem HP for DEGEN rewards on Base.",
+        "primaryCategory": "games",
         "tags": [
             "game",
-            "social"
+            "crypto",
+            "degen"
         ],
-        "tagline": "Earn USDC Mining on Base",
-        "ogTitle": "HashRush",
-        "ogDescription": "Mine, Earn, and Win! Experience the ultimate mining simulation on Base.",
-        "ogImageUrl": "https://hashrush.vercel.app/image.png"
+        "tagline": "Earn DEGEN Mining on Base"
     }
 }
