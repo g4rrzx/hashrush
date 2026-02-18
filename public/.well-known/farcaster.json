@@ -4,24 +4,29 @@
         "payload": "eyJkb21haW4iOiJoYXNocnVzaC52ZXJjZWwuYXBwIn0",
         "signature": "Fvrv5s3iXDp9XkVsGcDM3AOrqhW4wrruK0h7XMwaHWon6SzcjTt++XsGPYNYOXqMGl1EmUmoDjPhqtOifsbWexw="
     },
-    "frame": {
+    "miniapp": {
         "version": "1",
         "name": "HashRush",
-        "iconUrl": "https://hashrush.vercel.app/icon.png",
         "homeUrl": "https://hashrush.vercel.app",
-        "imageUrl": "https://hashrush.vercel.app/image.png",
-        "buttonTitle": "Start Mining",
+        "iconUrl": "https://hashrush.vercel.app/icon.png",
         "splashImageUrl": "https://hashrush.vercel.app/splash.png",
         "splashBackgroundColor": "#0f172a",
-        "webhookUrl": "https://hashrush.vercel.app/api/webhook",
         "subtitle": "Mine and Earn DEGEN",
         "description": "Mine, Earn, and Win! Build your rig, spin for prizes, and redeem HP for DEGEN rewards on Base.",
+        "screenshotUrls": [
+            "https://hashrush.vercel.app/screenshot1.png"
+        ],
         "primaryCategory": "games",
         "tags": [
-            "game",
-            "crypto",
-            "degen"
+            "game"
         ],
-        "tagline": "Earn DEGEN Mining on Base"
+        "heroImageUrl": "https://hashrush.vercel.app/image.png",
+        "tagline": "Earn DEGEN Mining on Base",
+        "ogTitle": "HashRush",
+        "ogDescription": "Mine, Earn, and Win! Build your rig and redeem HP for DEGEN.",
+        "ogImageUrl": "https://hashrush.vercel.app/image.png",
+        "imageUrl": "https://hashrush.vercel.app/image.png",
+        "buttonTitle": "Start Mining",
+        "webhookUrl": "https://hashrush.vercel.app/api/webhook"
     }
 }
