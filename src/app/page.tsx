@@ -520,6 +520,7 @@ export default function Home() {
     const init = async () => {
       const ctx = await sdk.context;
       setContext(ctx);
+      console.log("Calling sdk.actions.ready()");
       sdk.actions.ready();
     };
     if (sdk && !context) init();
