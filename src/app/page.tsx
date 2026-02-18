@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import sdk, { type Context } from "@farcaster/frame-sdk";
@@ -7,21 +7,23 @@ import { ethers } from "ethers";
 import { Attribution } from "ox/erc8021";
 
 const OWNER_ADDRESS = "0xe0E8222404BFb2Bf10B3A38A758b0Cff0336cd5B"; // Checksummed Verified
-const CONTRACT_ADDRESS = "0xb2f6e89002ECE5c498029660ce0E64300A9DCd95";
-const USDC_REWARD = 0.025; // 0.01 USDC per redeem
-const MIN_HP_REDEEM = 2000;
+const CONTRACT_ADDRESS = "0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63";
+const REWARD_AMOUNT = 5; // 5 DEGEN
+const REWARD_SYMBOL = "DEGEN";
+const MIN_HP_REDEEM = 2500;
 const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
 
 const CONTRACT_ABI = [
   "function claimPoints(uint256 amount) external",
   "function buyHardware(string itemId) external payable",
-  "function redeemUsdc(uint256 hpAmount) external",
+  "function redeemRewards(uint256 hpAmount) external",
   "function canRedeem(address user) external view returns (bool, string memory)",
   "function getRemainingCooldown(address user) external view returns (uint256)",
   "function getPoolBalance() external view returns (uint256)",
   "function getUserStats(address user) external view returns (uint256, uint256, uint256, uint256)",
-  "function rewardAmount() external view returns (uint256)"
+  "function rewardAmount() external view returns (uint256)",
+  "function rewardToken() external view returns (address)"
 ];
 
 type Tab = 'mine' | 'store' | 'rank' | 'profile';
@@ -872,7 +874,7 @@ export default function Home() {
   };
 
   // Redeem USDC from smart contract
-  const handleRedeemUSDC = async () => {
+  const handleRedeemRewards = async () => {
     console.log("handleRedeemUSDC called", { balance, MIN_HP_REDEEM, isTransacting, walletConnected });
 
     if (balance < MIN_HP_REDEEM || isTransacting) {
@@ -907,9 +909,9 @@ export default function Home() {
     try {
       // Create contract interface and data
       const iface = new ethers.Interface(CONTRACT_ABI);
-      const data = iface.encodeFunctionData("redeemUsdc", [BigInt(balance)]);
+      const data = iface.encodeFunctionData("redeemRewards", [BigInt(balance)]);
 
-      console.log("Calling redeemUsdc with balance:", balance);
+      console.log("Calling redeemRewards with balance:", balance);
 
       // Call contract directly via SDK provider
       const txParams = {
@@ -935,8 +937,8 @@ export default function Home() {
         if (soundEnabled) playKaching();
         haptic('heavy');
         triggerConfetti();
-        showToast('💵', `Claimed ${USDC_REWARD} USDC!`);
-        setTransactions(prev => [...prev, { type: 'claim', amount: `+${USDC_REWARD} USDC`, time: Date.now() }]);
+        showToast('💵', `Claimed ${REWARD_AMOUNT} ${REWARD_SYMBOL}!`);
+        setTransactions(prev => [...prev, { type: 'claim', amount: `+${REWARD_AMOUNT} ${REWARD_SYMBOL}`, time: Date.now() }]);
         // Reset cooldown locally to prevent immediate retry
         setUserCooldown(86400);
       }
@@ -1241,7 +1243,7 @@ export default function Home() {
               </div>
             ))}
 
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: 24, marginBottom: 16 }}>💵 Redeem USDC ({balance.toLocaleString()} HP available)</h3>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: 24, marginBottom: 16 }}>🎩 Redeem {REWARD_SYMBOL} ({balance.toLocaleString()} HP available)</h3>
 
             {/* Cooldown Warning - Show if cooldown active */}
             {userCooldown > 0 && (
@@ -1267,7 +1269,7 @@ export default function Home() {
             {/* USDC Redeem Card Centered */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
               <button
-                onClick={handleRedeemUSDC}
+                onClick={handleRedeemRewards}
                 disabled={balance < MIN_HP_REDEEM || userCooldown > 0}
                 className="card"
                 style={{
@@ -1299,9 +1301,9 @@ export default function Home() {
                   justifyContent: 'center',
                   margin: '0 auto 16px'
                 }}>
-                  {userCooldown > 0 ? <Clock size={32} /> : <DollarSign size={32} />}
+                  {userCooldown > 0 ? <Clock size={32} /> : <div style={{ fontSize: '32px' }}>🎩</div>}
                 </div>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{USDC_REWARD} USDC</h3>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{REWARD_AMOUNT} {REWARD_SYMBOL}</h3>
                 <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 12 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
 
                 <div style={{
@@ -1315,7 +1317,7 @@ export default function Home() {
                   {userCooldown > 0
                     ? `⏳ ${Math.floor(userCooldown / 3600)}h ${Math.floor((userCooldown % 3600) / 60)}m remaining`
                     : balance >= MIN_HP_REDEEM
-                      ? '✨ Ready to Claim'
+                      ? `✨ Ready to Claim ${REWARD_AMOUNT} ${REWARD_SYMBOL}`
                       : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`
                   }
                 </div>

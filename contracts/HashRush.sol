@@ -12,23 +12,23 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  */
 contract HashRush is Ownable, ReentrancyGuard {
     
-    // USDC on Base Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
-    IERC20 public immutable usdcToken;
+    // Reward Token (initially USDC, but can be updated)
+    IERC20 public rewardToken;
     
-    // Reward: 1000 HP = 0.1 USDC = 100000 (USDC has 6 decimals)
-    uint256 public rewardAmount = 100000; // 0.1 USDC
+    // Reward Amount (in token decimals)
+    uint256 public rewardAmount = 100000; // Default: 0.1 USDC (6 decimals)
     
-    // Minimum HP required to redeem USDC
+    // Minimum HP required to redeem
     uint256 public minHpRequired = 1000;
     
-    // Cooldown between USDC redeems (1 day)
+    // Cooldown between redeems (1 day)
     uint256 public redeemCooldown = 1 days;
     
     // Track last redeem time per user
     mapping(address => uint256) public lastRedeemTime;
     
-    // Track total USDC claimed per user
-    mapping(address => uint256) public totalUsdcClaimed;
+    // Track total Rewards claimed per user (generic counter)
+    mapping(address => uint256) public totalRewardsClaimed;
     
     // Track total HP claimed per user (on-chain record)
     mapping(address => uint256) public totalHpClaimed;
@@ -45,13 +45,14 @@ contract HashRush is Ownable, ReentrancyGuard {
     // Events
     event PointsClaimed(address indexed user, uint256 amount, uint256 totalClaimed, uint256 timestamp);
     event HardwarePurchased(address indexed user, string itemId, uint256 amount, uint256 timestamp);
-    event UsdcRedeemed(address indexed user, uint256 hpAmount, uint256 usdcAmount, uint256 timestamp);
+    event RewardRedeemed(address indexed user, uint256 hpAmount, uint256 rewardAmount, uint256 timestamp);
     event RewardAmountUpdated(uint256 oldAmount, uint256 newAmount);
+    event RewardTokenUpdated(address oldToken, address newToken);
     event Funded(address indexed funder, uint256 amount);
     event Withdrawn(address indexed owner, uint256 amount);
     
-    constructor(address _usdcToken) Ownable(msg.sender) {
-        usdcToken = IERC20(_usdcToken);
+    constructor(address _rewardToken) Ownable(msg.sender) {
+        rewardToken = IERC20(_rewardToken);
         
         // Set default hardware prices
         hardwarePrices["starter"] = 0.0005 ether;
@@ -95,42 +96,40 @@ contract HashRush is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev Redeem USDC reward - user pays only gas fee
+     * @dev Redeem Reward - user pays only gas fee
      * @param hpAmount The HP amount being redeemed (for logging)
      */
-    function redeemUsdc(uint256 hpAmount) external nonReentrant {
+    function redeemRewards(uint256 hpAmount) external nonReentrant {
         require(hpAmount >= minHpRequired, "Insufficient HP");
         require(
             block.timestamp >= lastRedeemTime[msg.sender] + redeemCooldown,
             "Cooldown not passed"
         );
         require(
-            usdcToken.balanceOf(address(this)) >= rewardAmount,
+            rewardToken.balanceOf(address(this)) >= rewardAmount,
             "Insufficient contract balance"
         );
         
         lastRedeemTime[msg.sender] = block.timestamp;
-        totalUsdcClaimed[msg.sender] += rewardAmount;
+        totalRewardsClaimed[msg.sender] += rewardAmount;
         
-        bool success = usdcToken.transfer(msg.sender, rewardAmount);
+        bool success = rewardToken.transfer(msg.sender, rewardAmount);
         require(success, "Transfer failed");
         
-        emit UsdcRedeemed(msg.sender, hpAmount, rewardAmount, block.timestamp);
+        emit RewardRedeemed(msg.sender, hpAmount, rewardAmount, block.timestamp);
     }
     
-    // Legacy function name for compatibility
-    function redeem(uint256 hpAmount) external {
-        this.redeemUsdc(hpAmount);
-    }
+    // Legacy function support removed or aliased if needed
+    // But better to update frontend to use new function name
     
     /**
-     * @dev Check if user can redeem USDC
+     * @dev Check if user can redeem
      */
     function canRedeem(address user) external view returns (bool, string memory) {
         if (block.timestamp < lastRedeemTime[user] + redeemCooldown) {
             return (false, "Cooldown active");
         }
-        if (usdcToken.balanceOf(address(this)) < rewardAmount) {
+        if (rewardToken.balanceOf(address(this)) < rewardAmount) {
             return (false, "Pool empty");
         }
         return (true, "Ready");
@@ -147,10 +146,10 @@ contract HashRush is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev Get contract USDC balance
+     * @dev Get contract Reward Token balance
      */
     function getPoolBalance() external view returns (uint256) {
-        return usdcToken.balanceOf(address(this));
+        return rewardToken.balanceOf(address(this));
     }
     
     /**
@@ -158,13 +157,13 @@ contract HashRush is Ownable, ReentrancyGuard {
      */
     function getUserStats(address user) external view returns (
         uint256 hpClaimed,
-        uint256 usdcClaimed,
+        uint256 rewardsClaimed,
         uint256 hardwareSpent,
         uint256 claims
     ) {
         return (
             totalHpClaimed[user],
-            totalUsdcClaimed[user],
+            totalRewardsClaimed[user],
             totalHardwareSpent[user],
             claimCount[user]
         );
@@ -188,6 +187,12 @@ contract HashRush is Ownable, ReentrancyGuard {
         rewardAmount = _amount;
     }
     
+    function setRewardToken(address _newToken) external onlyOwner {
+        require(_newToken != address(0), "Invalid address");
+        emit RewardTokenUpdated(address(rewardToken), _newToken);
+        rewardToken = IERC20(_newToken);
+    }
+    
     function setMinHpRequired(uint256 _minHp) external onlyOwner {
         minHpRequired = _minHp;
     }
@@ -196,11 +201,18 @@ contract HashRush is Ownable, ReentrancyGuard {
         redeemCooldown = _cooldown;
     }
     
-    function withdrawUSDC(uint256 amount) external onlyOwner {
-        require(usdcToken.balanceOf(address(this)) >= amount, "Insufficient balance");
-        bool success = usdcToken.transfer(owner(), amount);
+    // Generic withdraw for specific token (in case owner changes token and wants to withdraw old ones)
+    function withdrawToken(address _token, uint256 amount) external onlyOwner {
+        IERC20 token = IERC20(_token);
+        require(token.balanceOf(address(this)) >= amount, "Insufficient balance");
+        bool success = token.transfer(owner(), amount);
         require(success, "Withdraw failed");
         emit Withdrawn(owner(), amount);
+    }
+    
+    // Helper to withdraw current reward token
+    function withdrawRewards(uint256 amount) external onlyOwner {
+        this.withdrawToken(address(rewardToken), amount);
     }
     
     function withdrawETH() external onlyOwner {
