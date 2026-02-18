@@ -515,13 +515,16 @@ export default function Home() {
     }
   }, [context]);
 
-  // Load game data (Server -> Local -> New)
+  // Signal ready IMMEDIATELY on mount (must not wait for context)
+  useEffect(() => {
+    sdk.actions.ready();
+  }, []);
+
+  // Load context separately
   useEffect(() => {
     const init = async () => {
       const ctx = await sdk.context;
       setContext(ctx);
-      console.log("Calling sdk.actions.ready()");
-      sdk.actions.ready();
     };
     if (sdk && !context) init();
   }, [context]);
