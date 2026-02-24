@@ -9,24 +9,27 @@
         "name": "HashRush",
         "homeUrl": "https://hashrush.vercel.app",
         "iconUrl": "https://hashrush.vercel.app/icon.png",
+        "imageUrl": "https://hashrush.vercel.app/image.png",
+        "buttonTitle": "Start Mining",
         "splashImageUrl": "https://hashrush.vercel.app/splash.png",
         "splashBackgroundColor": "#0f172a",
-        "subtitle": "Mine and Earn DEGEN",
-        "description": "Mine, Earn, and Win! Build your rig, spin for prizes, and redeem HP for DEGEN rewards on Base.",
+        "webhookUrl": "https://hashrush.vercel.app/api/webhook",
+        "subtitle": "Mining and USDC Rewards",
+        "description": "Mine, Earn, and Win! Ultimate mining simulation on Base. Build your rig, spin for prizes, and redeem HP for USDC rewards.",
         "screenshotUrls": [
             "https://hashrush.vercel.app/screenshot1.png"
         ],
         "primaryCategory": "games",
         "tags": [
-            "game"
+            "game",
+            "mining",
+            "crypto"
         ],
         "heroImageUrl": "https://hashrush.vercel.app/image.png",
-        "tagline": "Earn DEGEN Mining on Base",
+        "tagline": "Earn USDC Mining on Base",
         "ogTitle": "HashRush",
-        "ogDescription": "Mine, Earn, and Win! Build your rig and redeem HP for DEGEN.",
+        "ogDescription": "Mine, Earn, and Win! Ultimate mining simulation on Base. Build your rig, spin for prizes, and redeem HP for USDC rewards.",
         "ogImageUrl": "https://hashrush.vercel.app/image.png",
-        "imageUrl": "https://hashrush.vercel.app/image.png",
-        "buttonTitle": "Start Mining",
-        "webhookUrl": "https://hashrush.vercel.app/api/webhook"
+        "castShareUrl": "https://hashrush.vercel.app"
     }
 }
