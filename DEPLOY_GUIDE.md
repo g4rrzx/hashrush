@@ -2,17 +2,17 @@
 
 ## ✅ Smart Contract Deployed!
 
-**Contract Address:** `0x3F65f80F006E5B2f74a4ED2D830dBec260A331B8`  
+**Contract Address:** `0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63`  
 **Network:** Base Mainnet  
-**USDC Address:** `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+**Reward Token:** DEGEN (`0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed`)
 
 ---
 
 ## 📋 Next Steps to Fund the Contract
 
-1. **Send USDC to Contract**  
-   Send USDC to: `0x3F65f80F006E5B2f74a4ED2D830dBec260A331B8`  
-   Each redeem gives user 0.01 USDC
+1. **Send DEGEN to Contract**  
+   Send DEGEN to: `0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63`  
+   Each redeem gives user 5 DEGEN
 
 2. **Verify Contract on BaseScan** (Optional)
    ```bash

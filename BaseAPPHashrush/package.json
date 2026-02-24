@@ -1,0 +1,18 @@
+{
+    "name": "hashrush-automation",
+    "version": "1.0.0",
+    "description": "Base Builder Code Attribution Bot for HashRush",
+    "main": "src/main.js",
+    "type": "module",
+    "scripts": {
+        "start": "node src/main.js",
+        "redeem": "node src/redeem.js"
+    },
+    "dependencies": {
+        "chalk": "^5.6.2",
+        "dotenv": "^16.4.5",
+        "ethers": "^6.11.1",
+        "ox": "^0.12.1",
+        "p-limit": "^5.0.0"
+    }
+}

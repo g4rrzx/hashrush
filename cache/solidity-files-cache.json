@@ -1,9 +1,9 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\cryptominer\\contracts\\HashRush.sol": {
-      "lastModificationDate": 1768727678655,
-      "contentHash": "43906025362915979379c70de6b04791",
+    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\hashrush\\contracts\\HashRush.sol": {
+      "lastModificationDate": 1771426881910,
+      "contentHash": "a536732dd0c5c49305ed7c738ba80292",
       "sourceName": "contracts/HashRush.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -41,7 +41,7 @@
         "HashRush"
       ]
     },
-    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\cryptominer\\node_modules\\@openzeppelin\\contracts\\utils\\ReentrancyGuard.sol": {
+    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\hashrush\\node_modules\\@openzeppelin\\contracts\\utils\\ReentrancyGuard.sol": {
       "lastModificationDate": 1768649153150,
       "contentHash": "190613e556d509d9e9a0ea43dc5d891d",
       "sourceName": "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
@@ -77,7 +77,7 @@
         "ReentrancyGuard"
       ]
     },
-    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\cryptominer\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\IERC20.sol": {
+    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\hashrush\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\IERC20.sol": {
       "lastModificationDate": 1768649146974,
       "contentHash": "9261adf6457863de3e9892f51317ec89",
       "sourceName": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
@@ -113,7 +113,7 @@
         "IERC20"
       ]
     },
-    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\cryptominer\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
+    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\hashrush\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
       "lastModificationDate": 1768649150255,
       "contentHash": "d3c790edc9ccf808a17c5a6cd13614fd",
       "sourceName": "@openzeppelin/contracts/access/Ownable.sol",
@@ -151,7 +151,7 @@
         "Ownable"
       ]
     },
-    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\cryptominer\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
+    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\hashrush\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
       "lastModificationDate": 1768649132423,
       "contentHash": "67bfbc07588eb8683b3fd8f6f909563e",
       "sourceName": "@openzeppelin/contracts/utils/Context.sol",
@@ -185,6 +185,50 @@
       ],
       "artifacts": [
         "Context"
+      ]
+    },
+    "C:\\Users\\USER\\Documents\\BOT\\LikeFarcast\\miniApps\\hashrush\\contracts\\HashRush_Flat_Clean.sol": {
+      "lastModificationDate": 1768742639576,
+      "contentHash": "b89b82cf0e338f3e710739d68fa0bc3a",
+      "sourceName": "contracts/HashRush_Flat_Clean.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20",
+        "^0.8.20",
+        ">=0.4.16",
+        "^0.8.20",
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Context",
+        "HashRush",
+        "IERC20",
+        "Ownable",
+        "ReentrancyGuard"
       ]
     }
   }

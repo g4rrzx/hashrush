@@ -8,8 +8,8 @@ import { Attribution } from "ox/erc8021";
 
 const OWNER_ADDRESS = "0xe0E8222404BFb2Bf10B3A38A758b0Cff0336cd5B"; // Checksummed Verified
 const CONTRACT_ADDRESS = "0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63";
-const REWARD_AMOUNT = 5; // 5 DEGEN
-const REWARD_SYMBOL = "DEGEN";
+const REWARD_AMOUNT = 5; // 5 USDC
+const REWARD_SYMBOL = "USDC";
 const MIN_HP_REDEEM = 2500;
 const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
@@ -91,7 +91,12 @@ type OwnedHardware = { id: string; count: number; totalBoost: number };
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAddFavorite, setShowAddFavorite] = useState(false);
@@ -352,6 +357,21 @@ export default function Home() {
     else document.documentElement.classList.remove('dark');
   }, [darkMode]);
 
+  // Listen for system theme changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      // Only auto-switch if user hasn't manually saved a preference
+      const savedPref = localStorage.getItem('hr_v12');
+      if (!savedPref) {
+        setDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   // Handle Referral on Load
   useEffect(() => {
     if (isLoading || !context) return;
@@ -428,9 +448,8 @@ export default function Home() {
 
   const getReferralLink = () => {
     const fid = context?.user?.fid || '0';
-    // Use official Farcaster Directory format
-    const baseUrl = "https://farcaster.xyz/miniapps/wbQq2mQrDpWS/hashrush";
-    const referralUrl = `${baseUrl}?ref=${fid}`;
+    // Use domain-based URL for client-agnostic compatibility
+    const referralUrl = `https://hashrush.vercel.app?ref=${fid}`;
     return referralUrl;
   };
 
@@ -1370,9 +1389,9 @@ export default function Home() {
                 {/* 2nd Place */}
                 <div
                   onClick={() => {
-                    if (leaderboardData[1]?.name) {
+                    if (leaderboardData[1]?.fid) {
                       haptic('light');
-                      sdk.actions.openUrl(`https://warpcast.com/${leaderboardData[1].name}`);
+                      sdk.actions.viewProfile({ fid: Number(leaderboardData[1].fid) });
                     }
                   }}
                   style={{
@@ -1427,9 +1446,9 @@ export default function Home() {
                 {/* 1st Place */}
                 <div
                   onClick={() => {
-                    if (leaderboardData[0]?.name) {
+                    if (leaderboardData[0]?.fid) {
                       haptic('light');
-                      sdk.actions.openUrl(`https://warpcast.com/${leaderboardData[0].name}`);
+                      sdk.actions.viewProfile({ fid: Number(leaderboardData[0].fid) });
                     }
                   }}
                   style={{
@@ -1487,9 +1506,9 @@ export default function Home() {
                 {/* 3rd Place */}
                 <div
                   onClick={() => {
-                    if (leaderboardData[2]?.name) {
+                    if (leaderboardData[2]?.fid) {
                       haptic('light');
-                      sdk.actions.openUrl(`https://warpcast.com/${leaderboardData[2].name}`);
+                      sdk.actions.viewProfile({ fid: Number(leaderboardData[2].fid) });
                     }
                   }}
                   style={{
@@ -1547,14 +1566,13 @@ export default function Home() {
             <div style={{ background: '#f8fafc', borderRadius: 16, padding: 12 }}>
               {(leaderboardData.length < 3 ? leaderboardData : leaderboardData.slice(3)).map((user, i) => {
                 const rank = leaderboardData.length < 3 ? i + 1 : i + 4;
-                const profileUrl = `https://warpcast.com/${user.name}`;
 
                 return (
                   <div
                     key={user.fid || i}
                     onClick={() => {
                       haptic('light');
-                      sdk.actions.openUrl(profileUrl);
+                      if (user.fid) sdk.actions.viewProfile({ fid: Number(user.fid) });
                     }}
                     style={{
                       display: 'flex',
@@ -1709,7 +1727,10 @@ export default function Home() {
               )}
 
               <button
-                onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🎮 Come play HashRush with me! Mine crypto and earn USDC rewards. 🚀\n\nUse my link for a 500 HP starter bonus!`)}&embeds[]=${encodeURIComponent(getReferralLink())}`)}
+                onClick={() => sdk.actions.composeCast({
+                  text: `🎮 Come play HashRush with me! Mine crypto and earn USDC rewards. 🚀\n\nUse my link for a 500 HP starter bonus!`,
+                  embeds: [getReferralLink()]
+                })}
                 className="btn-primary"
                 style={{ width: '100%' }}
               >
@@ -1769,7 +1790,10 @@ export default function Home() {
             </div>
 
             <button
-              onClick={() => sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(`🚀 Mining on HashRush!\n⚡ ${totalEarned.toLocaleString()} HP\n🏆 ${userTier.name} Tier`)}&embeds[]=${encodeURIComponent(getReferralLink())}`)}
+              onClick={() => sdk.actions.composeCast({
+                text: `🚀 Mining on HashRush!\n⚡ ${totalEarned.toLocaleString()} HP\n🏆 ${userTier.name} Tier`,
+                embeds: [getReferralLink()]
+              })}
               className="btn-primary"
               style={{ marginTop: 16 }}
             >
