@@ -8,8 +8,8 @@ import { Attribution } from "ox/erc8021";
 
 const OWNER_ADDRESS = "0xe0E8222404BFb2Bf10B3A38A758b0Cff0336cd5B"; // Checksummed Verified
 const CONTRACT_ADDRESS = "0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63";
-const REWARD_AMOUNT = 5; // 5 USDC
-const REWARD_SYMBOL = "USDC";
+const REWARD_AMOUNT = 5; // 5 DEGEN
+const REWARD_SYMBOL = "DEGEN";
 const MIN_HP_REDEEM = 2500;
 const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
