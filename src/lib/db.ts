@@ -5,19 +5,22 @@
  */
 import { neon } from '@neondatabase/serverless';
 
+// Singleton SQL client
+// Defaulting to a dummy URL during build so it doesn't crash if Vercel build doesn't have the env var yet
+const dbUrl = process.env.DATABASE_URL || 'postgres://dummy:dummy@dummy/dummy';
+
 if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not set');
+  console.warn('DATABASE_URL environment variable is not set. Real DB operations will fail.');
 }
 
-// Singleton SQL client
-export const sql = neon(process.env.DATABASE_URL);
+export const sql = neon(dbUrl);
 
 /**
  * Initialize semua tabel jika belum ada.
  * Dipanggil sekali saat server start / cold start.
  */
 export async function initDB() {
-    await sql`
+  await sql`
     CREATE TABLE IF NOT EXISTS users (
       fid TEXT PRIMARY KEY,
       wallet_address TEXT,
@@ -35,7 +38,7 @@ export async function initDB() {
     )
   `;
 
-    await sql`
+  await sql`
     CREATE TABLE IF NOT EXISTS rigs (
       id SERIAL PRIMARY KEY,
       fid TEXT REFERENCES users(fid) ON DELETE CASCADE,
@@ -46,7 +49,7 @@ export async function initDB() {
     )
   `;
 
-    await sql`
+  await sql`
     CREATE TABLE IF NOT EXISTS leaderboard (
       fid TEXT PRIMARY KEY,
       username TEXT,
@@ -57,7 +60,7 @@ export async function initDB() {
     )
   `;
 
-    await sql`
+  await sql`
     CREATE TABLE IF NOT EXISTS referrals (
       id SERIAL PRIMARY KEY,
       inviter_fid TEXT,
@@ -73,51 +76,51 @@ export async function initDB() {
  * Base rate = 10 MH/s + total boost dari semua rigs
  */
 export async function calcHashRate(fid: string): Promise<number> {
-    const rows = await sql`
+  const rows = await sql`
     SELECT COALESCE(SUM(boost), 0) as total_boost
     FROM rigs WHERE fid = ${fid}
   `;
-    return 10 + Number(rows[0].total_boost);
+  return 10 + Number(rows[0].total_boost);
 }
 
 /**
  * Ambil data lengkap user + rigs
  */
 export async function getUserData(fid: string) {
-    const users = await sql`
+  const users = await sql`
     SELECT * FROM users WHERE fid = ${fid}
   `;
-    if (users.length === 0) return null;
+  if (users.length === 0) return null;
 
-    const rigs = await sql`
+  const rigs = await sql`
     SELECT rig_type, boost, tx_hash, purchased_at
     FROM rigs WHERE fid = ${fid}
     ORDER BY purchased_at DESC
   `;
 
-    const user = users[0];
-    // Group rigs by type
-    const ownedHardware: Record<string, { id: string; count: number; totalBoost: number }> = {};
-    for (const rig of rigs) {
-        if (!ownedHardware[rig.rig_type]) {
-            ownedHardware[rig.rig_type] = { id: rig.rig_type, count: 0, totalBoost: 0 };
-        }
-        ownedHardware[rig.rig_type].count++;
-        ownedHardware[rig.rig_type].totalBoost += Number(rig.boost);
+  const user = users[0];
+  // Group rigs by type
+  const ownedHardware: Record<string, { id: string; count: number; totalBoost: number }> = {};
+  for (const rig of rigs) {
+    if (!ownedHardware[rig.rig_type]) {
+      ownedHardware[rig.rig_type] = { id: rig.rig_type, count: 0, totalBoost: 0 };
     }
+    ownedHardware[rig.rig_type].count++;
+    ownedHardware[rig.rig_type].totalBoost += Number(rig.boost);
+  }
 
-    return {
-        fid: user.fid,
-        walletAddress: user.wallet_address,
-        username: user.username,
-        pfpUrl: user.pfp_url,
-        points: Number(user.points),
-        balance: Number(user.balance),
-        totalEarned: Number(user.total_earned),
-        hashRate: Number(user.hash_rate),
-        streak: Number(user.streak),
-        lastMineAt: user.last_mine_at,
-        lastRedeemAt: user.last_redeem_at,
-        ownedHardware: Object.values(ownedHardware),
-    };
+  return {
+    fid: user.fid,
+    walletAddress: user.wallet_address,
+    username: user.username,
+    pfpUrl: user.pfp_url,
+    points: Number(user.points),
+    balance: Number(user.balance),
+    totalEarned: Number(user.total_earned),
+    hashRate: Number(user.hash_rate),
+    streak: Number(user.streak),
+    lastMineAt: user.last_mine_at,
+    lastRedeemAt: user.last_redeem_at,
+    ownedHardware: Object.values(ownedHardware),
+  };
 }
