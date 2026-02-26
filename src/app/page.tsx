@@ -337,31 +337,8 @@ export default function Home() {
     if (!isLoading && context) checkWallet();
   }, [isLoading, context, BASE_CHAIN_ID]);
 
-  // Check Contract State (Pool Balance & Cooldown)
-  useEffect(() => {
-    const checkContract = async () => {
-      if (!walletConnected || !isCorrectChain) return;
-      try {
-        const provider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-
-        // Get Pool Balance
-        const poolBal = await contract.getPoolBalance();
-        setContractPoolBalance(ethers.formatUnits(poolBal, 6)); // USDC 6 decimals
-
-        // Get Cooldown
-        if (walletAddress) {
-          const cooldown = await contract.getRemainingCooldown(walletAddress);
-          setUserCooldown(Number(cooldown));
-        }
-      } catch (err) {
-        console.error("Contract check failed:", err);
-      }
-    };
-    checkContract();
-    const interval = setInterval(checkContract, 30000); // Check every 30s
-    return () => clearInterval(interval);
-  }, [walletConnected, isCorrectChain, walletAddress]);
+  // Load redeem cooldown from server (not from contract anymore)
+  // Cooldown is now based on DB last_redeem_at, loaded in the user data init below
 
   // Local cooldown countdown (tick every second for real-time display)
   useEffect(() => {
@@ -608,6 +585,15 @@ export default function Home() {
           setHashRate(serverUser.hashRate); // from server (based on rigs in DB)
           setStreak(serverUser.streak);
           setLastMilestone(Math.floor(totalPoints / 100) * 100);
+
+          // Load redeem cooldown from DB (24h since last_redeem_at)
+          if (serverUser.lastRedeemAt) {
+            const lastRedeem = new Date(serverUser.lastRedeemAt).getTime();
+            const cooldownEnd = lastRedeem + 24 * 3600 * 1000; // 24h after last redeem
+            const remaining = Math.max(0, Math.floor((cooldownEnd - Date.now()) / 1000));
+            setUserCooldown(remaining);
+            console.log('[cooldown] Loaded from DB:', remaining, 'seconds remaining');
+          }
 
           // Owned hardware from server rigs
           if (serverUser.ownedHardware && serverUser.ownedHardware.length > 0) {
