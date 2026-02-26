@@ -4,8 +4,8 @@
  * POST: { fid, walletAddress, txHash, amount }
  * 
  * Flow:
- * 1. User kirim 0.000003 ETH ke contract via claimPoints()
- * 2. Server verify TX on-chain (status, from, to, value)
+ * 1. User kirim 0.000003 ETH ke contract (plain ETH transfer)
+ * 2. Server verify TX on-chain (status, from, to)
  * 3. Pindahkan points → balance di DB
  */
 import { NextRequest } from 'next/server';
@@ -13,50 +13,73 @@ import { sql, initDB } from '@/lib/db';
 
 const BASE_RPC = 'https://mainnet.base.org';
 const CONTRACT_ADDRESS = '0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63';
-const CLAIM_FEE_WEI = '0xAA87BEE538'; // 0.000003 ETH in hex (3000000000000 wei)
 
 interface TxVerifyResult {
     valid: boolean;
     error?: string;
 }
 
+// Wait for TX receipt with retries (TX might not be confirmed immediately)
 async function verifyClaimTx(txHash: string, expectedFrom: string): Promise<TxVerifyResult> {
-    try {
-        const res = await fetch(BASE_RPC, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'eth_getTransactionReceipt',
-                params: [txHash],
-                id: 1
-            })
-        });
-        const data = await res.json();
-        const receipt = data.result;
-        if (!receipt) return { valid: false, error: 'Transaction not found or not confirmed yet' };
+    const maxRetries = 5;
+    const retryDelay = 2000; // 2 seconds
 
-        // Check status = success
-        if (receipt.status !== '0x1') return { valid: false, error: 'Transaction failed on-chain' };
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            // Get TX receipt
+            const res = await fetch(BASE_RPC, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'eth_getTransactionReceipt',
+                    params: [txHash],
+                    id: 1
+                })
+            });
+            const data = await res.json();
+            const receipt = data.result;
 
-        // Check from address
-        const receiptFrom = receipt.from ? receipt.from.toLowerCase() : '';
-        const expected = expectedFrom ? expectedFrom.toLowerCase() : '';
-        if (receiptFrom === '' || receiptFrom !== expected) {
-            return { valid: false, error: 'Sender address mismatch' };
+            // TX not yet confirmed — retry
+            if (!receipt) {
+                if (attempt < maxRetries - 1) {
+                    console.log(`[verifyClaimTx] TX not confirmed yet, retry ${attempt + 1}/${maxRetries}...`);
+                    await new Promise(r => setTimeout(r, retryDelay));
+                    continue;
+                }
+                return { valid: false, error: 'Transaction not confirmed yet. Try again in a few seconds.' };
+            }
+
+            // Check status = success
+            if (receipt.status !== '0x1') {
+                return { valid: false, error: 'Transaction failed on-chain' };
+            }
+
+            // Check from address
+            const receiptFrom = (receipt.from || '').toLowerCase();
+            const expected = (expectedFrom || '').toLowerCase();
+            if (!receiptFrom || receiptFrom !== expected) {
+                return { valid: false, error: 'Sender address mismatch' };
+            }
+
+            // Check to address = Smart Contract
+            const receiptTo = (receipt.to || '').toLowerCase();
+            if (receiptTo !== CONTRACT_ADDRESS.toLowerCase()) {
+                return { valid: false, error: 'TX not sent to HashRush contract' };
+            }
+
+            return { valid: true };
+        } catch (err) {
+            console.error(`[verifyClaimTx] attempt ${attempt + 1} error:`, err);
+            if (attempt < maxRetries - 1) {
+                await new Promise(r => setTimeout(r, retryDelay));
+                continue;
+            }
+            return { valid: false, error: 'Verification error' };
         }
-
-        // Check to address = Smart Contract
-        const receiptTo = receipt.to ? receipt.to.toLowerCase() : '';
-        if (receiptTo !== CONTRACT_ADDRESS.toLowerCase()) {
-            return { valid: false, error: 'TX not sent to HashRush contract' };
-        }
-
-        return { valid: true };
-    } catch (err) {
-        console.error('[verifyClaimTx]', err);
-        return { valid: false, error: 'Verification error' };
     }
+
+    return { valid: false, error: 'Max retries exceeded' };
 }
 
 export async function POST(req: NextRequest) {
@@ -82,7 +105,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 3. Verify TX on-chain (status, from, to)
+        // 3. Verify TX on-chain (with retries for pending TX)
         const verification = await verifyClaimTx(txHash, walletAddress || user.wallet_address);
         if (!verification.valid) {
             console.warn(`[claim] TX verification failed: ${verification.error} (txHash: ${txHash})`);
