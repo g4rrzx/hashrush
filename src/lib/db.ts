@@ -69,6 +69,15 @@ export async function initDB() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS claimed_txs (
+      tx_hash TEXT PRIMARY KEY,
+      fid TEXT NOT NULL,
+      amount NUMERIC NOT NULL,
+      claimed_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
 }
 
 /**

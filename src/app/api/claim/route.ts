@@ -14,14 +14,13 @@ import { sql, initDB } from '@/lib/db';
 
 const BASE_RPC = 'https://mainnet.base.org';
 const CONTRACT_ADDRESS = '0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63';
-const MAX_CLAIM_PER_TX = 100000; // Safety cap: max 100K HP per claim
+const MAX_CLAIM_PER_TX = 100000; // Safety cap
 
 interface TxVerifyResult {
     valid: boolean;
     error?: string;
 }
 
-// Wait for TX receipt with retries
 async function verifyClaimTx(txHash: string, expectedFrom: string): Promise<TxVerifyResult> {
     const maxRetries = 5;
     const retryDelay = 2000;
@@ -43,7 +42,7 @@ async function verifyClaimTx(txHash: string, expectedFrom: string): Promise<TxVe
 
             if (!receipt) {
                 if (attempt < maxRetries - 1) {
-                    console.log(`[verifyClaimTx] TX not confirmed yet, retry ${attempt + 1}/${maxRetries}...`);
+                    console.log(`[verifyClaimTx] attempt ${attempt + 1}: TX not confirmed yet, retrying...`);
                     await new Promise(r => setTimeout(r, retryDelay));
                     continue;
                 }
@@ -57,12 +56,12 @@ async function verifyClaimTx(txHash: string, expectedFrom: string): Promise<TxVe
             const receiptFrom = (receipt.from || '').toLowerCase();
             const expected = (expectedFrom || '').toLowerCase();
             if (!receiptFrom || receiptFrom !== expected) {
-                return { valid: false, error: 'Sender address mismatch' };
+                return { valid: false, error: `Sender mismatch: ${receiptFrom} vs ${expected}` };
             }
 
             const receiptTo = (receipt.to || '').toLowerCase();
             if (receiptTo !== CONTRACT_ADDRESS.toLowerCase()) {
-                return { valid: false, error: 'TX not sent to HashRush contract' };
+                return { valid: false, error: `Wrong destination: ${receiptTo}` };
             }
 
             return { valid: true };
@@ -72,7 +71,7 @@ async function verifyClaimTx(txHash: string, expectedFrom: string): Promise<TxVe
                 await new Promise(r => setTimeout(r, retryDelay));
                 continue;
             }
-            return { valid: false, error: 'Verification error' };
+            return { valid: false, error: 'RPC verification error' };
         }
     }
 
@@ -83,17 +82,9 @@ export async function POST(req: NextRequest) {
     try {
         await initDB();
 
-        // Ensure claimed_txs table exists for anti-replay
-        await sql`
-      CREATE TABLE IF NOT EXISTS claimed_txs (
-        tx_hash TEXT PRIMARY KEY,
-        fid TEXT NOT NULL,
-        amount NUMERIC NOT NULL,
-        claimed_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `;
-
-        const { fid, walletAddress, txHash, amount } = await req.json();
+        const body = await req.json();
+        const { fid, walletAddress, txHash, amount } = body;
+        console.log(`[claim] Request: fid=${fid}, txHash=${txHash}, amount=${amount}`);
 
         if (!fid || !txHash || !amount) {
             return Response.json({ error: 'fid, txHash, and amount required' }, { status: 400 });
@@ -102,46 +93,49 @@ export async function POST(req: NextRequest) {
         // 1. Anti-replay: check if TX was already used
         const usedTx = await sql`SELECT 1 FROM claimed_txs WHERE tx_hash = ${txHash}`;
         if (usedTx.length > 0) {
+            console.warn(`[claim] TX already used: ${txHash}`);
             return Response.json({ error: 'This transaction was already used for a claim' }, { status: 400 });
         }
 
-        // 2. Get user from DB
+        // 2. Get user
         const users = await sql`SELECT * FROM users WHERE fid = ${fid}`;
         if (users.length === 0) {
+            console.warn(`[claim] User not found: ${fid}`);
             return Response.json({ error: 'User not found' }, { status: 404 });
         }
         const user = users[0];
 
-        // 3. Wallet address check
+        // 3. Wallet check
+        const userWallet = walletAddress || user.wallet_address;
         if (walletAddress && user.wallet_address) {
             if (user.wallet_address.toLowerCase() !== walletAddress.toLowerCase()) {
+                console.warn(`[claim] Wallet mismatch: ${walletAddress} vs ${user.wallet_address}`);
                 return Response.json({ error: 'Wallet address mismatch' }, { status: 403 });
             }
         }
 
-        // 4. Verify TX on-chain (with retries)
-        const verification = await verifyClaimTx(txHash, walletAddress || user.wallet_address);
+        // 4. Verify TX on-chain
+        console.log(`[claim] Verifying TX: ${txHash} from ${userWallet}`);
+        const verification = await verifyClaimTx(txHash, userWallet);
         if (!verification.valid) {
-            console.warn(`[claim] TX verification failed: ${verification.error} (txHash: ${txHash})`);
+            console.warn(`[claim] TX verify failed: ${verification.error}`);
             return Response.json({ error: verification.error }, { status: 400 });
         }
+        console.log(`[claim] TX verified successfully`);
 
-        // 5. Validate amount (safety cap)
+        // 5. Calculate claim amount (with safety cap)
         const claimAmount = Math.min(Math.floor(Number(amount)), MAX_CLAIM_PER_TX);
         if (claimAmount <= 0) {
             return Response.json({ error: 'Invalid claim amount' }, { status: 400 });
         }
 
-        // 6. Update DB: add claimed points to balance
-        // Mining happens client-side, so we trust the amount after TX verification
-        // The ETH payment IS the proof of claim
-        const newPoints = 0; // Reset mining buffer after claim
+        // 6. Update DB
         const newBalance = Number(user.balance) + claimAmount;
         const newTotalEarned = Number(user.total_earned) + claimAmount;
 
         await sql`
       UPDATE users SET
-        points = ${newPoints},
+        points = 0,
         balance = ${newBalance},
         total_earned = ${newTotalEarned},
         last_mine_at = NOW(),
@@ -149,7 +143,7 @@ export async function POST(req: NextRequest) {
       WHERE fid = ${fid}
     `;
 
-        // 7. Record TX as used (anti-replay)
+        // 7. Record TX (anti-replay)
         await sql`
       INSERT INTO claimed_txs (tx_hash, fid, amount)
       VALUES (${txHash}, ${fid}, ${claimAmount})
@@ -157,35 +151,29 @@ export async function POST(req: NextRequest) {
     `;
 
         // 8. Update leaderboard
+        const tier = newTotalEarned >= 50000 ? 'Diamond' : newTotalEarned >= 10000 ? 'Gold' : newTotalEarned >= 1000 ? 'Silver' : 'Bronze';
         await sql`
       INSERT INTO leaderboard (fid, username, pfp_url, score, tier, updated_at)
-      VALUES (${fid}, ${user.username}, ${user.pfp_url}, ${newTotalEarned}, 
-        ${newTotalEarned >= 50000 ? 'Diamond' : newTotalEarned >= 10000 ? 'Gold' : newTotalEarned >= 1000 ? 'Silver' : 'Bronze'}, 
-        NOW())
+      VALUES (${fid}, ${user.username}, ${user.pfp_url}, ${newTotalEarned}, ${tier}, NOW())
       ON CONFLICT (fid) DO UPDATE SET
         score = ${newTotalEarned},
-        tier = CASE 
-          WHEN ${newTotalEarned} >= 50000 THEN 'Diamond'
-          WHEN ${newTotalEarned} >= 10000 THEN 'Gold'
-          WHEN ${newTotalEarned} >= 1000 THEN 'Silver'
-          ELSE 'Bronze'
-        END,
+        tier = ${tier},
         username = COALESCE(${user.username}, leaderboard.username),
         pfp_url = COALESCE(${user.pfp_url}, leaderboard.pfp_url),
         updated_at = NOW()
     `;
 
-        console.log(`[claim] FID ${fid} claimed ${claimAmount} HP (paid 0.000003 ETH). Balance: ${newBalance}`);
+        console.log(`[claim] ✅ FID ${fid} claimed ${claimAmount} HP. New balance: ${newBalance}`);
 
         return Response.json({
             success: true,
             claimed: claimAmount,
             newBalance,
-            newPoints,
+            newPoints: 0,
             newTotalEarned
         });
-    } catch (err) {
-        console.error('[/api/claim POST]', err);
-        return Response.json({ error: 'Internal error' }, { status: 500 });
+    } catch (err: any) {
+        console.error('[/api/claim POST] FULL ERROR:', err?.message || err, err?.stack || '');
+        return Response.json({ error: `Server error: ${err?.message || 'unknown'}` }, { status: 500 });
     }
 }
