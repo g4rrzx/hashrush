@@ -799,13 +799,12 @@ export default function Home() {
     try {
       const claimed = Math.floor(points);
 
-      // Simple ETH transfer to contract (contract has receive() that accepts ETH)
-      // No function call needed — server validates the TX and updates DB
+      // Pure ETH transfer — contract has receive() but NO fallback()
+      // Any data causes revert, so we send NO data at all
       const txParams = {
         to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
         value: CLAIM_FEE_ETH as `0x${string}`, // 0.000003 ETH claim fee
-        data: DATA_SUFFIX as `0x${string}`, // Builder attribution only
         chainId: "0x2105" as `0x${string}`
       };
 
