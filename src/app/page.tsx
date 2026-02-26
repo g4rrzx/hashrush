@@ -2164,7 +2164,7 @@ export default function Home() {
 
               <button
                 onClick={() => sdk.actions.composeCast({
-                  text: `🎮 Come play HashRush with me! Mine crypto and earn USDC rewards. 🚀\n\nUse my link for a 500 HP starter bonus!`,
+                  text: `🎮 Come play HashRush with me! Mine crypto and earn rewards. 🚀\n\nUse my link for a 500 HP starter bonus!`,
                   embeds: [getReferralLink()]
                 })}
                 className="btn-primary"

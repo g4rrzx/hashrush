@@ -3,10 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "HashRush",
-  description: "Mine crypto, earn USDC rewards on Base.",
+  description: "Mine crypto, earn rewards on Base.",
   openGraph: {
     title: "HashRush",
-    description: "Mine crypto, earn USDC rewards on Base.",
+    description: "Mine crypto, earn rewards on Base.",
     images: [
       {
         url: "https://hashrush.vercel.app/image.png",
