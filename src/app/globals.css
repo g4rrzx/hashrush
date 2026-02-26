@@ -1716,3 +1716,24 @@ body {
     opacity: 0.85;
   }
 }
+
+/* Splash Screen Animations */
+@keyframes float {
+  from {
+    transform: translateY(0px) scale(1);
+  }
+
+  to {
+    transform: translateY(-20px) scale(1.2);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}

@@ -1073,18 +1073,78 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <>
-        <div className="app-bg" />
-        <main className="container">
-          <div className="skeleton-card" style={{ marginBottom: 16 }}>
-            <div className="flex items-center gap-3">
-              <div className="skeleton skeleton-circle" style={{ width: 42, height: 42 }} />
-              <div style={{ flex: 1 }}><div className="skeleton skeleton-text" style={{ width: '40%' }} /></div>
-            </div>
+      <div style={{
+        position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(145deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        overflow: 'hidden'
+      }}>
+        {/* Animated particles */}
+        {[...Array(20)].map((_, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            width: i % 3 === 0 ? 4 : 2,
+            height: i % 3 === 0 ? 4 : 2,
+            borderRadius: '50%',
+            background: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b'][i % 4],
+            opacity: 0.4,
+            left: `${(i * 5 + 3) % 100}%`,
+            top: `${(i * 7 + 10) % 100}%`,
+            animation: `float ${3 + (i % 3)}s ease-in-out infinite alternate`,
+            animationDelay: `${i * 0.2}s`
+          }} />
+        ))}
+
+        {/* Glowing circle behind logo */}
+        <div style={{
+          width: 140, height: 140, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'pulse 2s ease-in-out infinite', marginBottom: 24
+        }}>
+          <div style={{
+            width: 100, height: 100, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 40px rgba(139,92,246,0.4), 0 0 80px rgba(59,130,246,0.2)',
+            animation: 'bounceIn 0.8s ease-out'
+          }}>
+            <span style={{ fontSize: '48px' }}>⛏️</span>
           </div>
-          <div className="skeleton-card" style={{ padding: 40 }} />
-        </main>
-      </>
+        </div>
+
+        {/* Title */}
+        <h1 style={{
+          fontSize: '2rem', fontWeight: 900, color: 'white', marginBottom: 8,
+          background: 'linear-gradient(135deg, #60a5fa, #a78bfa, #c084fc)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          animation: 'slideUp 0.6s ease-out 0.2s both'
+        }}>HashRush</h1>
+
+        <p style={{
+          color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500, marginBottom: 32,
+          animation: 'slideUp 0.6s ease-out 0.4s both'
+        }}>Mine • Earn • Prosper</p>
+
+        {/* Loading bar */}
+        <div style={{
+          width: 200, height: 4, borderRadius: 100,
+          background: 'rgba(255,255,255,0.1)', overflow: 'hidden',
+          animation: 'slideUp 0.6s ease-out 0.6s both'
+        }}>
+          <div style={{
+            width: '100%', height: '100%', borderRadius: 100,
+            background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s ease-in-out infinite'
+          }} />
+        </div>
+
+        <p style={{
+          color: '#64748b', fontSize: '0.75rem', marginTop: 16,
+          animation: 'slideUp 0.6s ease-out 0.8s both'
+        }}>Connecting to Farcaster...</p>
+      </div>
     );
   }
 
