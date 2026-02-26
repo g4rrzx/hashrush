@@ -223,7 +223,7 @@ export default function Home() {
     try { sdk.haptics.impactOccurred(type); } catch { }
   }, []);
 
-  // Connect wallet
+  // Connect wallet — also enrolls user in Neon DB
   const connectWallet = async () => {
     haptic('medium');
     try {
@@ -232,7 +232,8 @@ export default function Home() {
       }) as string[];
 
       if (accounts && accounts.length > 0) {
-        setWalletAddress(accounts[0]);
+        const addr = accounts[0];
+        setWalletAddress(addr);
         setWalletConnected(true);
 
         // Check chain
@@ -245,8 +246,23 @@ export default function Home() {
           showToast('✅', 'Wallet connected!');
         } else {
           setIsCorrectChain(false);
-          // Try to switch to Base
           await switchToBase();
+        }
+
+        // Enroll/update user in Neon DB with wallet address
+        if (context?.user?.fid) {
+          try {
+            await fetch('/api/user', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fid: String(context.user.fid),
+                walletAddress: addr,
+                username: context.user.username,
+                pfpUrl: context.user.pfpUrl,
+              })
+            });
+          } catch (e) { console.error('User enroll failed', e); }
         }
       }
     } catch (error) {
@@ -548,91 +564,93 @@ export default function Home() {
     if (sdk && !context) init();
   }, [context]);
 
-  // Separate effect for loading data once FID is available
+  // Load data from Neon DB (server-authoritative)
   useEffect(() => {
     if (!context?.user?.fid || !isLoading) return;
 
     const loadData = async () => {
-      let data: any = null;
-      let fromServer = false;
+      const fid = String(context.user.fid);
 
-      // 1. Try load from Server
+      // 1. Upsert user in Neon DB (create if new, or fetch existing)
       try {
-        const res = await fetch(`/api/progress/${context.user.fid}`);
+        const res = await fetch('/api/user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fid,
+            username: context.user.username,
+            pfpUrl: context.user.pfpUrl,
+          })
+        });
         const json = await res.json();
-        if (json.success && json.data) {
-          data = json.data;
-          fromServer = true;
-          console.log('Loaded from Server');
-        }
-      } catch (e) {
-        console.error('Server load failed', e);
-      }
 
-      // 2. If no server data, try LocalStorage (Migration first time)
-      if (!data) {
-        const local = localStorage.getItem('hr_v12');
-        if (local) {
-          try {
-            data = JSON.parse(local);
-            console.log('Loaded from LocalStorage (Migration)');
-          } catch (e) { console.error(e); }
-        }
-      }
+        if (json.success && json.user) {
+          const serverUser = json.user;
+          console.log('[secure] Loaded from Neon DB:', serverUser);
 
-      // 3. Apply Data if exists
-      if (data) {
-        try {
-          const elapsed = (Date.now() - (data.time || Date.now())) / 1000;
-          const gain = (data.hashRate / 1000) * Math.min(elapsed, 86400 * 3); // Max 3 days offline
+          // Calculate offline mining gain based on SERVER hashrate
+          const lastMineAt = serverUser.lastMineAt ? new Date(serverUser.lastMineAt).getTime() : Date.now();
+          const elapsed = Math.min((Date.now() - lastMineAt) / 1000, 86400 * 3); // Max 3 days
+          const gain = (serverUser.hashRate / 1000) * elapsed;
 
-          const lastDate = new Date(data.time).toDateString();
-          const today = new Date().toDateString();
-          const yesterday = new Date(Date.now() - 86400000).toDateString();
+          // Apply state from server — server is source of truth
+          const totalPoints = serverUser.points + gain;
+          setPoints(totalPoints);
+          pointsRef.current = totalPoints;
+          setBalance(serverUser.balance);
+          setTotalEarned(serverUser.totalEarned);
+          setHashRate(serverUser.hashRate); // from server (based on rigs in DB)
+          setStreak(serverUser.streak);
+          setLastMilestone(Math.floor(totalPoints / 100) * 100);
 
-          if (lastDate === today) setStreak(data.streak || 1);
-          else if (lastDate === yesterday) setStreak((data.streak || 0) + 1);
-          else setStreak(1);
-
-          if (data.lastTapGameDate === today) {
-            setCanPlayTapGame(false);
-            setLastTapGameDate(data.lastTapGameDate);
-          } else {
-            setCanPlayTapGame(true);
-            setTimeout(() => setShowTapGame(true), 1500);
+          // Owned hardware from server rigs
+          if (serverUser.ownedHardware && serverUser.ownedHardware.length > 0) {
+            setOwnedHardware(serverUser.ownedHardware);
+            const totalRigs = serverUser.ownedHardware.reduce((s: number, r: any) => s + r.count, 0);
+            setInventory(i => ({ ...i, rigs: Math.max(1, totalRigs) }));
           }
-
-          // Apply state
-          setPoints(data.points + gain);
-          pointsRef.current = data.points + gain;
-          setBalance(data.balance || 0);
-          setTotalEarned(data.totalEarned || 0);
-          setLastMilestone(Math.floor((data.points + gain) / 100) * 100);
-          setInventory(data.inventory || { tickets: 0, tokens: 0, rigs: 1, spins: 0 });
-          setOwnedHardware(data.ownedHardware || [{ id: 'starter', count: 1, totalBoost: 10 }]);
-          setHashRate(data.hashRate || 10);
-          setUnlockedBadges(data.badges || []);
-          prevBadgesRef.current = data.badges || [];
-          setTransactions(data.transactions || []);
-          setDarkMode(data.darkMode || false);
-          setSoundEnabled(data.soundEnabled !== false);
-          setNotificationsEnabled(data.notificationsEnabled || false);
 
           if (gain > 0) setOfflineGain(gain);
 
-          // If migration (local but no server), save immediately
-          if (!fromServer) {
-            saveToServer({
-              points: data.points + gain, balance: data.balance, totalEarned: data.totalEarned,
-              inventory: data.inventory, ownedHardware: data.ownedHardware, hashRate: data.hashRate,
-              streak: data.streak, badges: data.badges, lastTapGameDate: data.lastTapGameDate,
-              transactions: data.transactions, darkMode: data.darkMode, soundEnabled: data.soundEnabled,
-              time: Date.now()
-            });
-          }
-        } catch (e) { console.error('Data apply error', e); }
-      } else {
-        setShowOnboarding(true);
+          // Load local-only prefs (dark mode, sound — not security critical)
+          try {
+            const local = localStorage.getItem('hr_prefs_v1');
+            if (local) {
+              const prefs = JSON.parse(local);
+              setDarkMode(prefs.darkMode ?? false);
+              setSoundEnabled(prefs.soundEnabled !== false);
+              setNotificationsEnabled(prefs.notificationsEnabled ?? false);
+              if (prefs.transactions) setTransactions(prefs.transactions);
+              if (prefs.badges) { setUnlockedBadges(prefs.badges); prevBadgesRef.current = prefs.badges; }
+            }
+          } catch { }
+
+        } else {
+          // New user — show onboarding
+          setShowOnboarding(true);
+          console.log('[secure] No existing user, showing onboarding');
+        }
+      } catch (e) {
+        console.error('[secure] Failed to load from Neon DB:', e);
+        // Fallback to localStorage if server unreachable
+        const local = localStorage.getItem('hr_v12');
+        if (local) {
+          try {
+            const data = JSON.parse(local);
+            setPoints(data.points || 0);
+            pointsRef.current = data.points || 0;
+            setBalance(data.balance || 0);
+            setTotalEarned(data.totalEarned || 0);
+            setHashRate(data.hashRate || 10);
+            setStreak(data.streak || 1);
+            setOwnedHardware(data.ownedHardware || [{ id: 'starter', count: 1, totalBoost: 10 }]);
+            setInventory(data.inventory || { tickets: 0, tokens: 0, rigs: 1, spins: 0 });
+            setDarkMode(data.darkMode || false);
+            setSoundEnabled(data.soundEnabled !== false);
+          } catch { }
+        } else {
+          setShowOnboarding(true);
+        }
       }
 
       setIsLoading(false);
@@ -641,46 +659,65 @@ export default function Home() {
       if (!localStorage.getItem('hr_added_favorite')) {
         setTimeout(async () => {
           try { await sdk.actions.addFrame(); localStorage.setItem('hr_added_favorite', 'true'); }
-          catch (e) { localStorage.setItem('hr_added_favorite', 'true'); }
+          catch { localStorage.setItem('hr_added_favorite', 'true'); }
         }, 1500);
       }
     };
 
     loadData();
-  }, [context, isLoading, saveToServer, sdk]);
+  }, [context, isLoading, sdk]);
 
-  // Auto-Save Loop (To Local & Server)
+  // Auto-Save Loop — Save prefs locally, sync mining progress to server
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !context?.user?.fid) return;
 
-    const saveData = {
-      points: pointsRef.current, balance, totalEarned, inventory, ownedHardware, hashRate, streak,
-      badges: unlockedBadges, lastTapGameDate, transactions: transactions.slice(-20),
-      darkMode, soundEnabled, notificationsEnabled, time: Date.now()
+    // Save only non-critical prefs to localStorage
+    const savePrefs = () => {
+      localStorage.setItem('hr_prefs_v1', JSON.stringify({
+        darkMode, soundEnabled, notificationsEnabled,
+        transactions: transactions.slice(-20),
+        badges: unlockedBadges,
+        lastTapGameDate,
+      }));
     };
 
-    const save = () => {
-      // 1. Local Save (Fast)
-      localStorage.setItem('hr_v12', JSON.stringify(saveData));
-    };
-
-    // Save to server less frequently or if forced
-    const saveServer = () => {
-      saveToServer(saveData);
+    // Sync mining progress to server every 30s
+    // Server validates hashRate from rigs in DB (anti-cheat)
+    const syncToServer = async () => {
+      if (!context?.user?.fid) return;
+      try {
+        const res = await fetch('/api/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fid: String(context.user.fid),
+            data: {
+              points: pointsRef.current,
+              balance,
+              totalEarned,
+              hashRate, // server will cap this to what DB says
+              streak,
+              username: context.user.username,
+              pfpUrl: context.user.pfpUrl,
+            }
+          })
+        });
+        const json = await res.json();
+        // If server says different hashrate, correct client
+        if (json.serverHashRate && json.serverHashRate !== hashRate) {
+          console.log(`[secure] Correcting hashRate: ${hashRate} → ${json.serverHashRate}`);
+          setHashRate(json.serverHashRate);
+        }
+      } catch (e) { console.error('[sync] Failed:', e); }
     };
 
     const interval = setInterval(() => {
-      save();
-      // Also save to server every 10s if active
-      if (Math.random() > 0.5) saveServer();
-    }, 5000);
+      savePrefs();
+      syncToServer();
+    }, 30000); // every 30s
 
-    // Save on close/hide
     const handleVisibility = () => {
-      if (document.hidden) {
-        save();
-        saveServer();
-      }
+      if (document.hidden) { savePrefs(); syncToServer(); }
     };
 
     document.addEventListener('visibilitychange', handleVisibility);
@@ -688,7 +725,7 @@ export default function Home() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isLoading, balance, totalEarned, inventory, ownedHardware, hashRate, streak, unlockedBadges, lastTapGameDate, transactions, darkMode, soundEnabled, notificationsEnabled, saveToServer]);
+  }, [isLoading, context, balance, totalEarned, hashRate, streak, unlockedBadges, lastTapGameDate, transactions, darkMode, soundEnabled, notificationsEnabled]);
 
   useEffect(() => {
     if (!mining || isLoading) return;
@@ -799,20 +836,37 @@ export default function Home() {
 
       console.log("Claim Points TX:", txParams);
 
-      const tx = await sdk.wallet.ethProvider.request({
+      const txHash = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [txParams]
       });
 
-      if (tx) {
-        // Success - update local state
-        setBalance(b => b + claimed);
-        setTotalEarned(t => t + claimed);
-        setPoints(0);
-        pointsRef.current = 0;
-        setTransactions(prev => [...prev, { type: 'claim', amount: `+${claimed} HP`, time: Date.now() }]);
-        if (soundEnabled) playKaching();
-        showToast('💰', `Claimed ${claimed} HP!`);
+      if (txHash) {
+        // [SECURE] Validate claim with Server
+        const res = await fetch('/api/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fid: String(context?.user?.fid),
+            walletAddress,
+            txHash,
+            amount: claimed
+          })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          // Success - update local state from server truth
+          setBalance(json.newBalance);
+          setTotalEarned(json.newTotalEarned);
+          setPoints(json.newPoints);
+          pointsRef.current = json.newPoints;
+          setTransactions(prev => [...prev, { type: 'claim', amount: `+${json.claimed} HP`, time: Date.now() }]);
+          if (soundEnabled) playKaching();
+          showToast('💰', `Claimed ${json.claimed} HP!`);
+        } else {
+          showToast('❌', json.error || 'Claim Verification Failed');
+        }
       }
     } catch (error: any) {
       console.error('Claim error:', error);
@@ -856,13 +910,30 @@ export default function Home() {
 
       console.log("Buy Hardware TX:", txParams);
 
-      const tx = await sdk.wallet.ethProvider.request({
+      const txHash = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [txParams]
       });
 
-      if (tx) {
-        completeHardwarePurchase(item);
+      if (txHash) {
+        // [SECURE] Validate buy rig with Server
+        const res = await fetch('/api/rigs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fid: String(context?.user?.fid),
+            walletAddress,
+            rigType: item.id,
+            txHash
+          })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          completeHardwarePurchase(item, json.newHashRate);
+        } else {
+          showToast('❌', json.error || 'Verification Failed');
+        }
       }
     } catch (error) {
       console.error('Buy error:', error);
@@ -872,8 +943,8 @@ export default function Home() {
     }
   };
 
-  const completeHardwarePurchase = (item: typeof HARDWARE_ITEMS[0]) => {
-    setHashRate(h => h + item.boost);
+  const completeHardwarePurchase = (item: typeof HARDWARE_ITEMS[0], newHashRate: number) => {
+    setHashRate(newHashRate);
     setInventory(i => ({ ...i, rigs: i.rigs + 1 }));
     setOwnedHardware(prev => {
       const existing = prev.find(h => h.id === item.id);
@@ -898,8 +969,9 @@ export default function Home() {
 
   // Redeem USDC from smart contract
   const handleRedeemRewards = async () => {
-    console.log("handleRedeemUSDC called", { balance, MIN_HP_REDEEM, isTransacting, walletConnected });
+    console.log("handleRedeem called", { balance, MIN_HP_REDEEM, isTransacting, walletConnected });
 
+    // Client check first, but server will also enforce this!
     if (balance < MIN_HP_REDEEM || isTransacting) {
       showToast('❌', `Need ${MIN_HP_REDEEM} HP minimum`);
       return;
@@ -919,7 +991,7 @@ export default function Home() {
       }
     }
 
-    // Check Cooldown (optional - contract will also check)
+    // Check Cooldown
     if (userCooldown > 0) {
       const hrs = Math.ceil(userCooldown / 3600);
       showToast('⏳', `Cooldown active: Wait ${hrs}h`);
@@ -932,9 +1004,7 @@ export default function Home() {
     try {
       // Create contract interface and data
       const iface = new ethers.Interface(CONTRACT_ABI);
-      const data = iface.encodeFunctionData("redeemRewards", [BigInt(balance)]);
-
-      console.log("Calling redeemRewards with balance:", balance);
+      const data = iface.encodeFunctionData("redeemRewards", [BigInt(balance)]); // Amount here is just for contract logging, the real check happens on our server
 
       // Call contract directly via SDK provider
       const txParams = {
@@ -945,25 +1015,42 @@ export default function Home() {
         chainId: "0x2105" as `0x${string}`
       };
 
-      console.log("TX Params:", txParams);
+      console.log("Redeem TX Params:", txParams);
 
-      const tx = await sdk.wallet.ethProvider.request({
+      const txHash = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
         params: [txParams]
       });
 
-      console.log("TX Result:", tx);
+      console.log("Redeem TX Hash:", txHash);
 
-      if (tx) {
-        // Success
-        setBalance(0);
-        if (soundEnabled) playKaching();
-        haptic('heavy');
-        triggerConfetti();
-        showToast('💵', `Claimed ${REWARD_AMOUNT} ${REWARD_SYMBOL}!`);
-        setTransactions(prev => [...prev, { type: 'claim', amount: `+${REWARD_AMOUNT} ${REWARD_SYMBOL}`, time: Date.now() }]);
-        // Reset cooldown locally to prevent immediate retry
-        setUserCooldown(86400);
+      if (txHash) {
+        // [SECURE] Validate redeem with server BEFORE deducting balance securely
+        const res = await fetch('/api/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fid: String(context?.user?.fid),
+            walletAddress,
+            txHash
+          })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          // Success
+          setBalance(json.newBalance);
+          if (soundEnabled) playKaching();
+          haptic('heavy');
+          triggerConfetti();
+          showToast('💵', `Claimed ${REWARD_AMOUNT} ${REWARD_SYMBOL}!`);
+          setTransactions(prev => [...prev, { type: 'claim', amount: `+${REWARD_AMOUNT} ${REWARD_SYMBOL}`, time: Date.now() }]);
+          setUserCooldown(86400); // 24h
+        } else {
+          showToast('❌', json.error || 'Server rejected redeem');
+          if (json.serverBalance !== undefined) setBalance(json.serverBalance);
+          if (json.hoursLeft) setUserCooldown(json.hoursLeft * 3600);
+        }
       }
     } catch (error) {
       console.error('Redeem error:', error);

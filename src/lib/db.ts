@@ -1,0 +1,123 @@
+/**
+ * Neon PostgreSQL Connection
+ * Menggunakan @neondatabase/serverless untuk serverless/edge compatibility
+ * Singleton pool — tidak membuat koneksi baru setiap request
+ */
+import { neon } from '@neondatabase/serverless';
+
+if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not set');
+}
+
+// Singleton SQL client
+export const sql = neon(process.env.DATABASE_URL);
+
+/**
+ * Initialize semua tabel jika belum ada.
+ * Dipanggil sekali saat server start / cold start.
+ */
+export async function initDB() {
+    await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      fid TEXT PRIMARY KEY,
+      wallet_address TEXT,
+      username TEXT,
+      pfp_url TEXT,
+      points NUMERIC DEFAULT 0,
+      balance NUMERIC DEFAULT 0,
+      total_earned NUMERIC DEFAULT 0,
+      hash_rate INTEGER DEFAULT 10,
+      streak INTEGER DEFAULT 1,
+      last_seen TIMESTAMPTZ DEFAULT NOW(),
+      last_mine_at TIMESTAMPTZ DEFAULT NOW(),
+      last_redeem_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+    await sql`
+    CREATE TABLE IF NOT EXISTS rigs (
+      id SERIAL PRIMARY KEY,
+      fid TEXT REFERENCES users(fid) ON DELETE CASCADE,
+      rig_type TEXT NOT NULL,
+      boost INTEGER NOT NULL,
+      tx_hash TEXT UNIQUE NOT NULL,
+      purchased_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+    await sql`
+    CREATE TABLE IF NOT EXISTS leaderboard (
+      fid TEXT PRIMARY KEY,
+      username TEXT,
+      pfp_url TEXT,
+      score NUMERIC DEFAULT 0,
+      tier TEXT DEFAULT 'Bronze',
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+    await sql`
+    CREATE TABLE IF NOT EXISTS referrals (
+      id SERIAL PRIMARY KEY,
+      inviter_fid TEXT,
+      invitee_fid TEXT UNIQUE,
+      bonus_awarded INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+}
+
+/**
+ * Hitung hashrate user berdasarkan semua rigs yang dimiliki
+ * Base rate = 10 MH/s + total boost dari semua rigs
+ */
+export async function calcHashRate(fid: string): Promise<number> {
+    const rows = await sql`
+    SELECT COALESCE(SUM(boost), 0) as total_boost
+    FROM rigs WHERE fid = ${fid}
+  `;
+    return 10 + Number(rows[0].total_boost);
+}
+
+/**
+ * Ambil data lengkap user + rigs
+ */
+export async function getUserData(fid: string) {
+    const users = await sql`
+    SELECT * FROM users WHERE fid = ${fid}
+  `;
+    if (users.length === 0) return null;
+
+    const rigs = await sql`
+    SELECT rig_type, boost, tx_hash, purchased_at
+    FROM rigs WHERE fid = ${fid}
+    ORDER BY purchased_at DESC
+  `;
+
+    const user = users[0];
+    // Group rigs by type
+    const ownedHardware: Record<string, { id: string; count: number; totalBoost: number }> = {};
+    for (const rig of rigs) {
+        if (!ownedHardware[rig.rig_type]) {
+            ownedHardware[rig.rig_type] = { id: rig.rig_type, count: 0, totalBoost: 0 };
+        }
+        ownedHardware[rig.rig_type].count++;
+        ownedHardware[rig.rig_type].totalBoost += Number(rig.boost);
+    }
+
+    return {
+        fid: user.fid,
+        walletAddress: user.wallet_address,
+        username: user.username,
+        pfpUrl: user.pfp_url,
+        points: Number(user.points),
+        balance: Number(user.balance),
+        totalEarned: Number(user.total_earned),
+        hashRate: Number(user.hash_rate),
+        streak: Number(user.streak),
+        lastMineAt: user.last_mine_at,
+        lastRedeemAt: user.last_redeem_at,
+        ownedHardware: Object.values(ownedHardware),
+    };
+}

@@ -1,44 +1,61 @@
-// Leaderboard API - connects to VPS backend
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://37.114.34.131:3001';
+/**
+ * /api/leaderboard - Leaderboard dari Neon DB (bukan VPS proxy)
+ * 
+ * GET → Top 50 players dari DB
+ * POST → Upsert score (dipanggil setelah claim)
+ */
+import { NextRequest } from 'next/server';
+import { sql, initDB } from '@/lib/db';
 
 export async function GET() {
     try {
-        const res = await fetch(`${API_BASE}/api/leaderboard`, {
-            cache: 'no-store'
-        });
+        await initDB();
 
-        if (!res.ok) {
-            console.error('VPS API error:', res.status);
-            return Response.json([]);
-        }
+        const rows = await sql`
+      SELECT fid, username, pfp_url, score, tier
+      FROM leaderboard
+      ORDER BY score DESC
+      LIMIT 50
+    `;
 
-        const data = await res.json();
+        const data = rows.map(r => ({
+            fid: r.fid,
+            name: r.username || `User ${r.fid}`,
+            score: Number(r.score),
+            tier: r.tier || 'Bronze',
+            pfpUrl: r.pfp_url || null,
+        }));
+
         return Response.json(data);
-    } catch (error) {
-        console.error('Leaderboard GET error:', error);
+    } catch (err) {
+        console.error('[/api/leaderboard GET]', err);
         return Response.json([]);
     }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
+        await initDB();
+        const { fid, username, score, tier, pfpUrl } = await req.json();
 
-        const res = await fetch(`${API_BASE}/api/leaderboard`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-
-        if (!res.ok) {
-            console.error('VPS API POST error:', res.status);
-            return Response.json({ error: 'Failed to sync' }, { status: 500 });
+        if (!fid) {
+            return Response.json({ error: 'fid required' }, { status: 400 });
         }
 
-        const data = await res.json();
-        return Response.json(data);
-    } catch (error) {
-        console.error('Leaderboard POST error:', error);
-        return Response.json({ error: 'Failed to update score' }, { status: 500 });
+        await sql`
+      INSERT INTO leaderboard (fid, username, pfp_url, score, tier, updated_at)
+      VALUES (${fid}, ${username || null}, ${pfpUrl || null}, ${score || 0}, ${tier || 'Bronze'}, NOW())
+      ON CONFLICT (fid) DO UPDATE SET
+        username = COALESCE(${username || null}, leaderboard.username),
+        pfp_url = COALESCE(${pfpUrl || null}, leaderboard.pfp_url),
+        score = GREATEST(${score || 0}, leaderboard.score),
+        tier = ${tier || 'Bronze'},
+        updated_at = NOW()
+    `;
+
+        return Response.json({ success: true });
+    } catch (err) {
+        console.error('[/api/leaderboard POST]', err);
+        return Response.json({ error: 'Internal error' }, { status: 500 });
     }
 }
