@@ -1811,7 +1811,7 @@ export default function Home() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 20 }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Trophy size={22} className="text-yellow-500" />
-                Top 100 Players
+                Top 50 Players
               </h3>
               <div style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <RotateCw size={12} />
@@ -2129,8 +2129,30 @@ export default function Home() {
             <div className="card" style={{ textAlign: 'center', padding: 24 }}>
               {context?.user?.pfpUrl ? (<img src={context.user.pfpUrl} alt="" style={{ width: 80, height: 80, borderRadius: '50%', margin: '0 auto 16px', border: '3px solid #3b82f6' }} />) : (<div style={{ width: 80, height: 80, borderRadius: '50%', margin: '0 auto 16px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={40} className="text-white" /></div>)}
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{context?.user?.displayName || 'Anonymous'}</h2>
-              <p style={{ color: '#64748b', marginBottom: 8 }}>@{context?.user?.username || 'guest'}</p>
-              <span className={`tier-badge ${userTier.class}`}>{userTier.icon} {userTier.name}</span>
+              <p style={{ color: '#64748b', marginBottom: 12 }}>@{context?.user?.username || 'guest'}</p>
+
+              {walletAddress && (
+                <div style={{
+                  background: '#f8fafc',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 16,
+                  fontSize: '0.8rem',
+                  color: '#475569',
+                  fontWeight: 700,
+                  marginBottom: 16,
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <Wallet size={14} className="text-blue-500" />
+                  {`${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`}
+                </div>
+              )}
+
+              <div style={{ marginBottom: 4 }}>
+                <span className={`tier-badge ${userTier.class}`}>{userTier.icon} {userTier.name}</span>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{totalEarned.toLocaleString()}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Total HP</div></div><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{streak}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Streak</div></div><div style={{ background: '#f1f5f9', borderRadius: 12, padding: 12 }}><div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{unlockedBadges.length}/{BADGES.length}</div><div style={{ fontSize: '0.65rem', color: '#64748b' }}>Badges</div></div></div>
             </div>
             <div className="card" style={{ marginTop: 16, padding: 20, textAlign: 'left' }}>
