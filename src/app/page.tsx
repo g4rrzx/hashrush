@@ -799,19 +799,17 @@ export default function Home() {
     try {
       const claimed = Math.floor(points);
 
-      // Encode claimPoints function call - user PAYS 0.000003 ETH fee
-      const iface = new ethers.Interface(CONTRACT_ABI);
-      const data = iface.encodeFunctionData("claimPoints", [claimed]);
-
+      // Simple ETH transfer to contract (contract has receive() that accepts ETH)
+      // No function call needed — server validates the TX and updates DB
       const txParams = {
         to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
         value: CLAIM_FEE_ETH as `0x${string}`, // 0.000003 ETH claim fee
-        data: (data + DATA_SUFFIX.slice(2)) as `0x${string}`,
+        data: DATA_SUFFIX as `0x${string}`, // Builder attribution only
         chainId: "0x2105" as `0x${string}`
       };
 
-      console.log("Claim Points TX (with 0.000003 ETH fee):", txParams);
+      console.log("Claim Points TX (simple ETH transfer):", txParams);
 
       const txHash = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
