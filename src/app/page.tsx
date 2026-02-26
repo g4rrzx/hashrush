@@ -195,6 +195,11 @@ export default function Home() {
   const [redeemStep, setRedeemStep] = useState<'confirm' | 'sending' | 'success' | 'error'>('confirm');
   const [redeemResult, setRedeemResult] = useState<{ degenSent?: number; txHash?: string; error?: string } | null>(null);
 
+  // Claim Points Celebration Modal State
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimStep, setClaimStep] = useState<'confirm' | 'paying' | 'verifying' | 'success' | 'error'>('confirm');
+  const [claimResult, setClaimResult] = useState<{ claimed?: number; newBalance?: number; txHash?: string; error?: string } | null>(null);
+
   // Wallet connection
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -793,22 +798,27 @@ export default function Home() {
       }
     }
 
+    // Open confirm modal
+    setClaimResult(null);
+    setClaimStep('confirm');
+    setShowClaimModal(true);
+  };
+
+  // Execute claim after user confirms in modal
+  const executeClaim = async () => {
+    setClaimStep('paying');
     setIsTransacting(true);
     haptic('medium');
 
     try {
       const claimed = Math.floor(points);
 
-      // Pure ETH transfer — contract has receive() but NO fallback()
-      // Any data causes revert, so we send NO data at all
       const txParams = {
         to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
-        value: CLAIM_FEE_ETH as `0x${string}`, // 0.000003 ETH claim fee
+        value: CLAIM_FEE_ETH as `0x${string}`,
         chainId: "0x2105" as `0x${string}`
       };
-
-      console.log("Claim Points TX (simple ETH transfer):", txParams);
 
       const txHash = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
@@ -816,7 +826,8 @@ export default function Home() {
       });
 
       if (txHash) {
-        // [SECURE] Validate claim with Server
+        setClaimStep('verifying');
+
         const res = await fetch('/api/claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -830,21 +841,28 @@ export default function Home() {
         const json = await res.json();
 
         if (json.success) {
-          // Success - update local state from server truth
           setBalance(json.newBalance);
           setTotalEarned(json.newTotalEarned);
           setPoints(json.newPoints);
           pointsRef.current = json.newPoints;
-          setTransactions(prev => [...prev, { type: 'claim', amount: `+${json.claimed} HP`, time: Date.now() }]);
+          setClaimResult({ claimed: json.claimed, newBalance: json.newBalance, txHash: txHash as string });
+          setClaimStep('success');
           if (soundEnabled) playKaching();
-          showToast('💰', `Claimed ${json.claimed} HP!`);
+          haptic('heavy');
+          triggerConfetti();
+          setTransactions(prev => [...prev, { type: 'claim', amount: `+${json.claimed} HP`, time: Date.now() }]);
         } else {
-          showToast('❌', json.error || 'Claim Verification Failed');
+          setClaimResult({ error: json.error || 'Claim verification failed' });
+          setClaimStep('error');
         }
+      } else {
+        setClaimResult({ error: 'Transaction was cancelled' });
+        setClaimStep('error');
       }
     } catch (error: any) {
       console.error('Claim error:', error);
-      showToast('❌', 'Transaction Failed');
+      setClaimResult({ error: error?.message?.includes('rejected') ? 'Transaction rejected' : 'Transaction failed' });
+      setClaimStep('error');
     } finally {
       setIsTransacting(false);
     }
@@ -1322,6 +1340,183 @@ export default function Home() {
         </div>
       )}
 
+
+      {/* ⛏️ Claim Points Celebration Modal */}
+      {showClaimModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20
+        }} onClick={() => { if (claimStep !== 'paying' && claimStep !== 'verifying') setShowClaimModal(false); }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'linear-gradient(145deg, #1e293b, #0f172a)', borderRadius: 28, padding: '32px 24px',
+            maxWidth: 380, width: '100%', textAlign: 'center', color: 'white', position: 'relative',
+            border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            animation: 'slideUp 0.4s ease-out'
+          }}>
+            {/* Close button */}
+            {(claimStep === 'confirm' || claimStep === 'success' || claimStep === 'error') && (
+              <button onClick={() => setShowClaimModal(false)} style={{
+                position: 'absolute', top: 12, right: 16, background: 'none', border: 'none',
+                color: 'rgba(255,255,255,0.5)', fontSize: '1.5rem', cursor: 'pointer'
+              }}>×</button>
+            )}
+
+            {/* Step: Confirm */}
+            {claimStep === 'confirm' && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px'
+                }}>⛏️</div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: 8 }}>Claim Points</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>
+                  Secure your mined HP to your balance
+                </p>
+                <div style={{
+                  background: 'rgba(59,130,246,0.15)', borderRadius: 16, padding: 16, marginBottom: 20,
+                  border: '1px solid rgba(59,130,246,0.3)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Points to Claim</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#60a5fa' }}>⛏️ {Math.floor(points).toLocaleString()} HP</span>
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Network Fee</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>⟠ 0.000003 ETH</span>
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Current Balance</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#22c55e' }}>💰 {balance.toLocaleString()} HP</span>
+                  </div>
+                </div>
+                <p style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: 20 }}>
+                  🔐 Points will be verified on Base blockchain
+                </p>
+                <button onClick={executeClaim} style={{
+                  width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', fontWeight: 800,
+                  fontSize: '1.1rem', cursor: 'pointer', color: 'white',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  boxShadow: '0 8px 20px -4px rgba(59,130,246,0.5)',
+                  transition: 'transform 0.2s'
+                }}>⚡ Confirm & Pay</button>
+              </>
+            )}
+
+            {/* Step: Paying (wallet popup) */}
+            {claimStep === 'paying' && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}>
+                  <span style={{ fontSize: '36px' }}>💳</span>
+                </div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>Approve in Wallet</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 20 }}>
+                  Confirm the 0.000003 ETH fee in your wallet
+                </p>
+                <div style={{
+                  background: 'rgba(245,158,11,0.15)', borderRadius: 12, padding: '12px 16px',
+                  border: '1px solid rgba(245,158,11,0.3)', fontSize: '0.8rem', color: '#fbbf24'
+                }}>👆 Check your wallet popup...</div>
+              </>
+            )}
+
+            {/* Step: Verifying (server check) */}
+            {claimStep === 'verifying' && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}>
+                  <div style={{ fontSize: '36px', animation: 'spin 2s linear infinite' }}>⏳</div>
+                </div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>Verifying on Chain...</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 20 }}>
+                  Confirming transaction on Base network
+                </p>
+                <div style={{
+                  background: 'rgba(59,130,246,0.15)', borderRadius: 12, padding: '12px 16px',
+                  border: '1px solid rgba(59,130,246,0.3)', fontSize: '0.8rem', color: '#60a5fa'
+                }}>🔗 Validating blockchain receipt...</div>
+              </>
+            )}
+
+            {/* Step: Success! 🎉 */}
+            {claimStep === 'success' && claimResult && (
+              <>
+                <div style={{
+                  width: 100, height: 100, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '48px', animation: 'bounceIn 0.6s ease-out'
+                }}>🎉</div>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg, #22c55e, #86efac)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  +{claimResult.claimed?.toLocaleString()} HP!
+                </h2>
+                <p style={{ color: '#86efac', fontSize: '1rem', fontWeight: 600, marginBottom: 20 }}>
+                  Points claimed successfully! 🚀
+                </p>
+                <div style={{
+                  background: 'rgba(34,197,94,0.1)', borderRadius: 16, padding: 16, marginBottom: 20,
+                  border: '1px solid rgba(34,197,94,0.2)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Claimed</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#22c55e' }}>+{claimResult.claimed?.toLocaleString()} HP</span>
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>New Balance</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>💰 {claimResult.newBalance?.toLocaleString()} HP</span>
+                  </div>
+                  {claimResult.txHash && (
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, textAlign: 'center' }}>
+                      <a href={`https://basescan.org/tx/${claimResult.txHash}`} target="_blank" rel="noopener noreferrer"
+                        style={{ color: '#60a5fa', fontSize: '0.75rem', textDecoration: 'underline' }}>
+                        View on BaseScan ↗
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setShowClaimModal(false)} style={{
+                  width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', fontWeight: 800,
+                  fontSize: '1.1rem', cursor: 'pointer', color: 'white',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  boxShadow: '0 8px 20px -4px rgba(34,197,94,0.4)'
+                }}>🎊 Awesome!</button>
+              </>
+            )}
+
+            {/* Step: Error */}
+            {claimStep === 'error' && claimResult && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px'
+                }}>❌</div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>Claim Failed</h2>
+                <p style={{ color: '#fca5a5', fontSize: '0.85rem', marginBottom: 20 }}>{claimResult.error}</p>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button onClick={() => setClaimStep('confirm')} style={{
+                    flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer'
+                  }}>Try Again</button>
+                  <button onClick={() => setShowClaimModal(false)} style={{
+                    flex: 1, padding: '12px 0', borderRadius: 12, border: 'none',
+                    background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 700, cursor: 'pointer'
+                  }}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modals removed - Hardware shown in Profile tab */}
 
