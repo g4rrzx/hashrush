@@ -8,7 +8,8 @@ import { Attribution } from "ox/erc8021";
 
 const OWNER_ADDRESS = "0xe0E8222404BFb2Bf10B3A38A758b0Cff0336cd5B"; // Checksummed Verified
 const CONTRACT_ADDRESS = "0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63";
-const REWARD_AMOUNT = 5; // 5 DEGEN
+const REWARD_AMOUNT = 20; // 20 DEGEN
+const CLAIM_FEE_ETH = "0x0B2D05E000"; // 0.000003 ETH in hex (3000000000000 wei = 0xB2D05E000)
 const REWARD_SYMBOL = "DEGEN";
 const MIN_HP_REDEEM = 2500;
 const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
@@ -86,7 +87,7 @@ const getStreakResetTime = () => {
   return tomorrow.getTime() - now.getTime();
 };
 
-type Transaction = { type: 'claim' | 'buy' | 'spin' | 'game'; amount: string; time: number };
+type Transaction = { type: 'claim' | 'buy' | 'spin' | 'game' | 'redeem'; amount: string; time: number };
 type OwnedHardware = { id: string; count: number; totalBoost: number };
 
 export default function Home() {
@@ -822,19 +823,19 @@ export default function Home() {
     try {
       const claimed = Math.floor(points);
 
-      // Encode claimPoints function call - NO ETH, only gas fee
+      // Encode claimPoints function call - user PAYS 0.000003 ETH fee
       const iface = new ethers.Interface(CONTRACT_ABI);
       const data = iface.encodeFunctionData("claimPoints", [claimed]);
 
       const txParams = {
         to: CONTRACT_ADDRESS as `0x${string}`,
         from: walletAddress as `0x${string}`,
-        value: "0x0" as `0x${string}`, // NO ETH transfer
+        value: CLAIM_FEE_ETH as `0x${string}`, // 0.000003 ETH claim fee
         data: (data + DATA_SUFFIX.slice(2)) as `0x${string}`,
         chainId: "0x2105" as `0x${string}`
       };
 
-      console.log("Claim Points TX:", txParams);
+      console.log("Claim Points TX (with 0.000003 ETH fee):", txParams);
 
       const txHash = await sdk.wallet.ethProvider.request({
         method: "eth_sendTransaction",
@@ -967,7 +968,7 @@ export default function Home() {
     else setInventory(i => ({ ...i, tokens: i.tokens + 1 }));
   };
 
-  // Redeem USDC from smart contract
+  // Redeem DEGEN — Server sends automatically, NO wallet TX needed!
   const handleRedeemRewards = async () => {
     console.log("handleRedeem called", { balance, MIN_HP_REDEEM, isTransacting, walletConnected });
 
@@ -982,15 +983,6 @@ export default function Home() {
       return;
     }
 
-    // Enforce Base Chain
-    if (!isCorrectChain) {
-      await switchToBase();
-      if (!isCorrectChain) {
-        showToast('⚠️', 'Please switch to Base Mainnet');
-        return;
-      }
-    }
-
     // Check Cooldown
     if (userCooldown > 0) {
       const hrs = Math.ceil(userCooldown / 3600);
@@ -1000,57 +992,33 @@ export default function Home() {
 
     setIsTransacting(true);
     haptic('medium');
+    showToast('⏳', 'Sending DEGEN to your wallet...');
 
     try {
-      // Create contract interface and data
-      const iface = new ethers.Interface(CONTRACT_ABI);
-      const data = iface.encodeFunctionData("redeemRewards", [BigInt(balance)]); // Amount here is just for contract logging, the real check happens on our server
-
-      // Call contract directly via SDK provider
-      const txParams = {
-        to: CONTRACT_ADDRESS as `0x${string}`,
-        from: walletAddress as `0x${string}`,
-        data: (data + DATA_SUFFIX.slice(2)) as `0x${string}`,
-        value: "0x0" as `0x${string}`,
-        chainId: "0x2105" as `0x${string}`
-      };
-
-      console.log("Redeem TX Params:", txParams);
-
-      const txHash = await sdk.wallet.ethProvider.request({
-        method: "eth_sendTransaction",
-        params: [txParams]
+      // [SECURE] Server handles everything — sends DEGEN from admin wallet
+      const res = await fetch('/api/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fid: String(context?.user?.fid),
+          walletAddress
+        })
       });
+      const json = await res.json();
 
-      console.log("Redeem TX Hash:", txHash);
-
-      if (txHash) {
-        // [SECURE] Validate redeem with server BEFORE deducting balance securely
-        const res = await fetch('/api/redeem', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fid: String(context?.user?.fid),
-            walletAddress,
-            txHash
-          })
-        });
-        const json = await res.json();
-
-        if (json.success) {
-          // Success
-          setBalance(json.newBalance);
-          if (soundEnabled) playKaching();
-          haptic('heavy');
-          triggerConfetti();
-          showToast('💵', `Claimed ${REWARD_AMOUNT} ${REWARD_SYMBOL}!`);
-          setTransactions(prev => [...prev, { type: 'claim', amount: `+${REWARD_AMOUNT} ${REWARD_SYMBOL}`, time: Date.now() }]);
-          setUserCooldown(86400); // 24h
-        } else {
-          showToast('❌', json.error || 'Server rejected redeem');
-          if (json.serverBalance !== undefined) setBalance(json.serverBalance);
-          if (json.hoursLeft) setUserCooldown(json.hoursLeft * 3600);
-        }
+      if (json.success) {
+        // Success — server sent DEGEN!
+        setBalance(json.newBalance);
+        if (soundEnabled) playKaching();
+        haptic('heavy');
+        triggerConfetti();
+        showToast('💵', `Received ${json.degenSent} ${REWARD_SYMBOL}!`);
+        setTransactions(prev => [...prev, { type: 'redeem', amount: `+${json.degenSent} ${REWARD_SYMBOL}`, time: Date.now() }]);
+        setUserCooldown(86400); // 24h
+      } else {
+        showToast('❌', json.error || 'Redeem failed');
+        if (json.serverBalance !== undefined) setBalance(json.serverBalance);
+        if (json.hoursLeft) setUserCooldown(json.hoursLeft * 3600);
       }
     } catch (error) {
       console.error('Redeem error:', error);
@@ -1414,7 +1382,8 @@ export default function Home() {
                   {userCooldown > 0 ? <Clock size={32} /> : <div style={{ fontSize: '32px' }}>🎩</div>}
                 </div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{REWARD_AMOUNT} {REWARD_SYMBOL}</h3>
-                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 12 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+                <p style={{ fontSize: '0.7rem', opacity: 0.75, marginBottom: 12 }}>🔒 Server sends DEGEN automatically • No gas fee!</p>
 
                 <div style={{
                   background: balance >= MIN_HP_REDEEM || userCooldown > 0 ? 'rgba(255,255,255,0.15)' : '#cbd5e1',

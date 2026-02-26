@@ -1,20 +1,26 @@
 /**
- * /api/claim - Klaim poin setelah transaksi blockchain berhasil
+ * /api/claim - Klaim poin setelah user bayar 0.000003 ETH ke Smart Contract
  * 
  * POST: { fid, walletAddress, txHash, amount }
  * 
- * ANTI-CHEAT:
- * 1. Verify wallet address match dengan user di DB
- * 2. Verify txHash valid di Base blockchain
- * 3. Check amount <= user.points di DB (tidak bisa claim lebih dari yang dipunya)
- * 4. Pindahkan dari points buffer → balance (bisa redeem)
+ * Flow:
+ * 1. User kirim 0.000003 ETH ke contract via claimPoints()
+ * 2. Server verify TX on-chain (status, from, to, value)
+ * 3. Pindahkan points → balance di DB
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB } from '@/lib/db';
 
 const BASE_RPC = 'https://mainnet.base.org';
+const CONTRACT_ADDRESS = '0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63';
+const CLAIM_FEE_WEI = '0xAA87BEE538'; // 0.000003 ETH in hex (3000000000000 wei)
 
-async function verifyTxOnChain(txHash: string, expectedFrom: string): Promise<boolean> {
+interface TxVerifyResult {
+    valid: boolean;
+    error?: string;
+}
+
+async function verifyClaimTx(txHash: string, expectedFrom: string): Promise<TxVerifyResult> {
     try {
         const res = await fetch(BASE_RPC, {
             method: 'POST',
@@ -28,16 +34,28 @@ async function verifyTxOnChain(txHash: string, expectedFrom: string): Promise<bo
         });
         const data = await res.json();
         const receipt = data.result;
-        if (!receipt) return false;
-        // Verify status = success (0x1) dan from address match
-        const isSuccess = receipt.status === '0x1';
+        if (!receipt) return { valid: false, error: 'Transaction not found or not confirmed yet' };
+
+        // Check status = success
+        if (receipt.status !== '0x1') return { valid: false, error: 'Transaction failed on-chain' };
+
+        // Check from address
         const receiptFrom = receipt.from ? receipt.from.toLowerCase() : '';
         const expected = expectedFrom ? expectedFrom.toLowerCase() : '';
-        const fromMatch = receiptFrom !== '' && receiptFrom === expected;
-        return isSuccess && fromMatch;
+        if (receiptFrom === '' || receiptFrom !== expected) {
+            return { valid: false, error: 'Sender address mismatch' };
+        }
+
+        // Check to address = Smart Contract
+        const receiptTo = receipt.to ? receipt.to.toLowerCase() : '';
+        if (receiptTo !== CONTRACT_ADDRESS.toLowerCase()) {
+            return { valid: false, error: 'TX not sent to HashRush contract' };
+        }
+
+        return { valid: true };
     } catch (err) {
-        console.error('[verifyTx]', err);
-        return false;
+        console.error('[verifyClaimTx]', err);
+        return { valid: false, error: 'Verification error' };
     }
 }
 
@@ -57,30 +75,21 @@ export async function POST(req: NextRequest) {
         }
         const user = users[0];
 
-        // 2. Jika wallet address dikirim, pastikan match dengan DB
+        // 2. Wallet address check
         if (walletAddress && user.wallet_address) {
             if (user.wallet_address.toLowerCase() !== walletAddress.toLowerCase()) {
-                console.warn(`[claim] Wallet mismatch for FID ${fid}: DB=${user.wallet_address}, got=${walletAddress}`);
                 return Response.json({ error: 'Wallet address mismatch' }, { status: 403 });
             }
         }
 
-        // 3. Cek apakah txHash sudah pernah dipakai (replay attack prevention)
-        const existing = await sql`
-      SELECT 1 FROM rigs WHERE tx_hash = ${txHash}
-      UNION
-      SELECT 1 FROM referrals WHERE invitee_fid = ${txHash}
-    `;
-        // Note: kita simpan claim tx hash di tabel tersendiri nanti, untuk sementara cek via unique claim log
-
-        // 4. Verify TX di blockchain
-        const txValid = await verifyTxOnChain(txHash, walletAddress || user.wallet_address);
-        if (!txValid) {
-            console.warn(`[claim] Invalid TX: ${txHash}`);
-            return Response.json({ error: 'Transaction not valid or not confirmed' }, { status: 400 });
+        // 3. Verify TX on-chain (status, from, to)
+        const verification = await verifyClaimTx(txHash, walletAddress || user.wallet_address);
+        if (!verification.valid) {
+            console.warn(`[claim] TX verification failed: ${verification.error} (txHash: ${txHash})`);
+            return Response.json({ error: verification.error }, { status: 400 });
         }
 
-        // 5. Validate amount <= points di DB
+        // 4. Validate amount <= points di DB
         const claimAmount = Number(amount);
         const serverPoints = Number(user.points);
 
@@ -96,7 +105,7 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: 'Insufficient points in server balance' }, { status: 400 });
         }
 
-        // 6. Update DB: pindah poin dari buffer ke balance
+        // 5. Update DB: pindah poin dari buffer ke balance
         const newPoints = Math.max(0, serverPoints - safeClaimAmount);
         const newBalance = Number(user.balance) + safeClaimAmount;
         const newTotalEarned = Number(user.total_earned) + safeClaimAmount;
@@ -110,7 +119,7 @@ export async function POST(req: NextRequest) {
       WHERE fid = ${fid}
     `;
 
-        // 7. Update leaderboard
+        // 6. Update leaderboard
         await sql`
       INSERT INTO leaderboard (fid, username, pfp_url, score, tier, updated_at)
       VALUES (${fid}, ${user.username}, ${user.pfp_url}, ${newTotalEarned}, 
@@ -129,7 +138,7 @@ export async function POST(req: NextRequest) {
         updated_at = NOW()
     `;
 
-        console.log(`[claim] FID ${fid} claimed ${safeClaimAmount} HP. Balance: ${newBalance}`);
+        console.log(`[claim] FID ${fid} claimed ${safeClaimAmount} HP (paid 0.000003 ETH). Balance: ${newBalance}`);
 
         return Response.json({
             success: true,

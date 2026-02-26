@@ -322,7 +322,7 @@ pragma solidity ^0.8.20;
 contract HashRush is Ownable, ReentrancyGuard {
     
     // USDC on Base Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
-    IERC20 public immutable usdcToken;
+    IERC20 public usdcToken;
     
     // Reward: 1000 HP = 0.1 USDC = 100000 (USDC has 6 decimals)
     uint256 public rewardAmount = 100000; // 0.1 USDC
