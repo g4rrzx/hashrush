@@ -64,8 +64,6 @@ export async function POST(req: NextRequest) {
         await sql`
       UPDATE users SET
         points = ${safePoints},
-        balance = ${Number(data.balance) || Number(user.balance)},
-        total_earned = ${Math.max(Number(data.totalEarned) || 0, Number(user.total_earned))},
         hash_rate = ${serverHashRate},
         streak = ${newStreak},
         username = COALESCE(${data.username || null}, username),
