@@ -371,75 +371,60 @@ export default function Home() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Handle Referral on Load
+  // Handle Referral on Load — SERVER-AUTHORITATIVE
   useEffect(() => {
-    if (isLoading || !context) return;
+    if (isLoading || !context?.user?.fid) return;
 
-    // Check both window.location and farcaster context for ref param
     const urlParams = new URLSearchParams(window.location.search);
-
-    // Some Farcaster context versions use different structures for location
     const sdkContext = context as any;
     const contextSearch = sdkContext?.location?.search || '';
     const contextParams = contextSearch ? new URLSearchParams(contextSearch) : null;
-
     const ref = urlParams.get('ref') || contextParams?.get('ref');
 
-    if (ref && !localStorage.getItem('hr_ref_claimed')) {
-      console.log('Referral detected from FID:', ref);
-      const bonus = 500;
-      setBalance(b => b + bonus);
-      setTotalEarned(t => t + bonus);
-      showToast('🎁', 'Referral Bonus: +500 HP!');
-      localStorage.setItem('hr_ref_claimed', 'true');
-      haptic('heavy');
-      triggerConfetti();
-
-      // Notify API to give bonus to inviter too
+    if (ref && ref !== String(context.user.fid)) {
+      // Call server — server checks duplicates in DB, NOT localStorage
       fetch('/api/referral', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inviterFid: ref,
-          inviteeFid: context?.user?.fid,
-          inviteeUsername: context?.user?.username
+          inviteeFid: String(context.user.fid),
+          inviteeUsername: context.user.username
         })
-      }).catch(console.error);
+      })
+        .then(r => r.json())
+        .then(json => {
+          if (json.success) {
+            // Server confirmed this is a NEW referral — update local state from DB
+            setBalance(b => b + 500);
+            setTotalEarned(t => t + 500);
+            showToast('🎁', 'Referral Bonus: +500 HP!');
+            haptic('heavy');
+            triggerConfetti();
+            console.log('[referral] New referral registered:', ref);
+          } else {
+            // Already referred or invalid — do NOT give bonus
+            console.log('[referral] Skipped:', json.message || json.error);
+          }
+        })
+        .catch(console.error);
     }
   }, [isLoading, context]);
 
-  // Fetch referral stats and apply bonus for inviter
+  // Fetch referral stats (read-only, no local bonus — server already handles it in DB)
   useEffect(() => {
     const fetchReferralStats = async () => {
       if (!context?.user?.fid) return;
       try {
         const res = await fetch(`/api/referral?fid=${context.user.fid}`);
         const data = await res.json();
-
         if (data.count !== undefined) setReferralCount(data.count);
         if (data.referrals) setReferralList(data.referrals);
-
-        // Apply referral bonus to inviter if they haven't received it yet
-        const lastBonusApplied = parseInt(localStorage.getItem('hr_ref_bonus_applied') || '0');
-        const currentBonus = data.bonusAwarded || 0;
-
-        if (currentBonus > lastBonusApplied) {
-          const newBonus = currentBonus - lastBonusApplied;
-          setBalance(b => b + newBonus);
-          setTotalEarned(t => t + newBonus);
-          localStorage.setItem('hr_ref_bonus_applied', String(currentBonus));
-
-          if (newBonus > 0) {
-            showToast('🎁', `Referral Bonus: +${newBonus} HP!`);
-            haptic('heavy');
-          }
-        }
       } catch (e) {
         console.error('Referral stats failed', e);
       }
     };
 
-    // Fetch on profile tab AND on initial load
     if (!isLoading && context?.user?.fid) {
       fetchReferralStats();
     }
