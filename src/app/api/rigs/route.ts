@@ -40,7 +40,9 @@ async function verifyTxOnChain(txHash: string, expectedFrom: string): Promise<bo
         const receipt = data.result;
         if (!receipt) return false;
         const isSuccess = receipt.status === '0x1';
-        const fromMatch = receipt.from?.toLowerCase() === expectedFrom?.toLowerCase();
+        const receiptFrom = receipt.from ? receipt.from.toLowerCase() : '';
+        const expected = expectedFrom ? expectedFrom.toLowerCase() : '';
+        const fromMatch = receiptFrom !== '' && receiptFrom === expected;
         return isSuccess && fromMatch;
     } catch (err) {
         console.error('[verifyTx]', err);
