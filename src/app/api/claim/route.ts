@@ -64,6 +64,32 @@ async function verifyClaimTx(txHash: string, expectedFrom: string): Promise<TxVe
                 return { valid: false, error: `Wrong destination: ${receiptTo}` };
             }
 
+            // Verify Transaction Value via eth_getTransactionByHash
+            const resTx = await fetch(BASE_RPC, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'eth_getTransactionByHash',
+                    params: [txHash],
+                    id: 2
+                })
+            });
+            const txData = await resTx.json();
+            const transaction = txData.result;
+
+            if (!transaction) {
+                return { valid: false, error: 'Transaction details not found' };
+            }
+
+            // Check if user sent at least 0.000003 ETH (3000000000000 wei)
+            const expectedWei = BigInt("3000000000000");
+            const valueSent = BigInt(transaction.value || "0");
+
+            if (valueSent < expectedWei) {
+                return { valid: false, error: `INSUFFICIENT_FUNDS: Sent ${valueSent.toString()} wei, expected at least ${expectedWei.toString()} wei` };
+            }
+
             return { valid: true };
         } catch (err) {
             console.error(`[verifyClaimTx] attempt ${attempt + 1} error:`, err);
@@ -123,32 +149,44 @@ export async function POST(req: NextRequest) {
         }
         console.log(`[claim] TX verified successfully`);
 
-        // 5. Calculate claim amount (with safety cap)
-        const claimAmount = Math.min(Math.floor(Number(amount)), MAX_CLAIM_PER_TX);
+        // 5. Calculate claim amount (from DB points, NOT user payload)
+        const claimAmount = Math.min(Number(user.points), MAX_CLAIM_PER_TX);
         if (claimAmount <= 0) {
-            return Response.json({ error: 'Invalid claim amount' }, { status: 400 });
+            return Response.json({ error: 'No points available to claim' }, { status: 400 });
         }
 
-        // 6. Update DB
-        const newBalance = Number(user.balance) + claimAmount;
-        const newTotalEarned = Number(user.total_earned) + claimAmount;
+        // 6 & 7. Atomic DB Update & Record TX (anti-replay)
 
-        await sql`
-      UPDATE users SET
-        points = 0,
-        balance = ${newBalance},
-        total_earned = ${newTotalEarned},
-        last_mine_at = NOW(),
-        last_seen = NOW()
-      WHERE fid = ${fid}
-    `;
+        // Attempt to insert txHash to claimed_txs first. If duplicate, Postgres will throw error.
+        try {
+            await sql`
+              INSERT INTO claimed_txs (tx_hash, fid, amount)
+              VALUES (${txHash}, ${fid}, ${claimAmount})
+            `;
+        } catch (dbError: any) {
+            // Unique constraint violation means tx was already used
+            return Response.json({ error: 'This transaction was already used for a claim' }, { status: 400 });
+        }
 
-        // 7. Record TX (anti-replay)
-        await sql`
-      INSERT INTO claimed_txs (tx_hash, fid, amount)
-      VALUES (${txHash}, ${fid}, ${claimAmount})
-      ON CONFLICT (tx_hash) DO NOTHING
-    `;
+        // Now safe to atomic update user balances
+        const result = await sql`
+          UPDATE users SET
+            points = 0,
+            balance = balance + ${claimAmount},
+            total_earned = total_earned + ${claimAmount},
+            last_mine_at = NOW(),
+            last_seen = NOW()
+          WHERE fid = ${fid}
+          RETURNING balance, total_earned
+        `;
+
+        if (result.length === 0) {
+            return Response.json({ error: 'Failed to update user' }, { status: 500 });
+        }
+
+        const updatedUser = result[0];
+        const newBalance = Number(updatedUser.balance);
+        const newTotalEarned = Number(updatedUser.total_earned);
 
         // 8. Update leaderboard
         const tier = newTotalEarned >= 50000 ? 'Diamond' : newTotalEarned >= 10000 ? 'Gold' : newTotalEarned >= 1000 ? 'Silver' : 'Bronze';
