@@ -11,7 +11,7 @@ const CONTRACT_ADDRESS = "0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63";
 const REWARD_AMOUNT = 20; // 20 DEGEN
 const CLAIM_FEE_ETH = "0x0B2D05E000"; // 0.000003 ETH in hex (3000000000000 wei = 0xB2D05E000)
 const REWARD_SYMBOL = "DEGEN";
-const MIN_HP_REDEEM = 2500;
+const MIN_HP_REDEEM = 5000;
 const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
 
@@ -189,6 +189,11 @@ export default function Home() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [toast, setToast] = useState<{ icon: string; text: string } | null>(null);
   const [showHardware, setShowHardware] = useState(false);
+
+  // Redeem Celebration Modal State
+  const [showRedeemModal, setShowRedeemModal] = useState(false);
+  const [redeemStep, setRedeemStep] = useState<'confirm' | 'sending' | 'success' | 'error'>('confirm');
+  const [redeemResult, setRedeemResult] = useState<{ degenSent?: number; txHash?: string; error?: string } | null>(null);
 
   // Wallet connection
   const [walletConnected, setWalletConnected] = useState(false);
@@ -968,13 +973,12 @@ export default function Home() {
     else setInventory(i => ({ ...i, tokens: i.tokens + 1 }));
   };
 
-  // Redeem DEGEN — Server sends automatically, NO wallet TX needed!
+  // Redeem DEGEN — Show celebration modal!
   const handleRedeemRewards = async () => {
     console.log("handleRedeem called", { balance, MIN_HP_REDEEM, isTransacting, walletConnected });
 
-    // Client check first, but server will also enforce this!
     if (balance < MIN_HP_REDEEM || isTransacting) {
-      showToast('❌', `Need ${MIN_HP_REDEEM} HP minimum`);
+      showToast('❌', `Need ${MIN_HP_REDEEM.toLocaleString()} HP minimum`);
       return;
     }
 
@@ -983,19 +987,25 @@ export default function Home() {
       return;
     }
 
-    // Check Cooldown
     if (userCooldown > 0) {
       const hrs = Math.ceil(userCooldown / 3600);
       showToast('⏳', `Cooldown active: Wait ${hrs}h`);
       return;
     }
 
+    // Show the modal in confirm state
+    setRedeemResult(null);
+    setRedeemStep('confirm');
+    setShowRedeemModal(true);
+  };
+
+  // Actually execute the redeem after user confirms in modal
+  const executeRedeem = async () => {
+    setRedeemStep('sending');
     setIsTransacting(true);
     haptic('medium');
-    showToast('⏳', 'Sending DEGEN to your wallet...');
 
     try {
-      // [SECURE] Server handles everything — sends DEGEN from admin wallet
       const res = await fetch('/api/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1007,22 +1017,24 @@ export default function Home() {
       const json = await res.json();
 
       if (json.success) {
-        // Success — server sent DEGEN!
         setBalance(json.newBalance);
+        setRedeemResult({ degenSent: json.degenSent, txHash: json.txHash });
+        setRedeemStep('success');
         if (soundEnabled) playKaching();
         haptic('heavy');
         triggerConfetti();
-        showToast('💵', `Received ${json.degenSent} ${REWARD_SYMBOL}!`);
         setTransactions(prev => [...prev, { type: 'redeem', amount: `+${json.degenSent} ${REWARD_SYMBOL}`, time: Date.now() }]);
-        setUserCooldown(86400); // 24h
+        setUserCooldown(86400);
       } else {
-        showToast('❌', json.error || 'Redeem failed');
+        setRedeemResult({ error: json.error || 'Redeem failed' });
+        setRedeemStep('error');
         if (json.serverBalance !== undefined) setBalance(json.serverBalance);
         if (json.hoursLeft) setUserCooldown(json.hoursLeft * 3600);
       }
     } catch (error) {
       console.error('Redeem error:', error);
-      showToast('❌', 'Redeem Failed');
+      setRedeemResult({ error: 'Network error. Try again.' });
+      setRedeemStep('error');
     } finally {
       setIsTransacting(false);
     }
@@ -1134,6 +1146,151 @@ export default function Home() {
         <div className="toast">
           <span style={{ fontSize: '1.5rem' }}>{toast.icon}</span>
           <span style={{ fontWeight: 600 }}>{toast.text}</span>
+        </div>
+      )}
+
+      {/* 🎉 Redeem Celebration Modal */}
+      {showRedeemModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20
+        }} onClick={() => { if (redeemStep !== 'sending') setShowRedeemModal(false); }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'linear-gradient(145deg, #1e293b, #0f172a)', borderRadius: 28, padding: '32px 24px',
+            maxWidth: 380, width: '100%', textAlign: 'center', color: 'white', position: 'relative',
+            border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            animation: 'slideUp 0.4s ease-out'
+          }}>
+            {/* Close button */}
+            {redeemStep !== 'sending' && (
+              <button onClick={() => setShowRedeemModal(false)} style={{
+                position: 'absolute', top: 12, right: 16, background: 'none', border: 'none',
+                color: 'rgba(255,255,255,0.5)', fontSize: '1.5rem', cursor: 'pointer'
+              }}>×</button>
+            )}
+
+            {/* Step: Confirm */}
+            {redeemStep === 'confirm' && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px'
+                }}>🎩</div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: 8 }}>Claim {REWARD_AMOUNT} {REWARD_SYMBOL}</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>
+                  Exchange {MIN_HP_REDEEM.toLocaleString()} HP for {REWARD_AMOUNT} DEGEN tokens
+                </p>
+                <div style={{
+                  background: 'rgba(139,92,246,0.15)', borderRadius: 16, padding: 16, marginBottom: 20,
+                  border: '1px solid rgba(139,92,246,0.3)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>You Pay</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>🔥 {MIN_HP_REDEEM.toLocaleString()} HP</span>
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>You Receive</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#a78bfa' }}>🎩 {REWARD_AMOUNT} DEGEN</span>
+                  </div>
+                </div>
+                <p style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: 20 }}>
+                  🔒 Sent directly to your wallet • No gas fee required
+                </p>
+                <button onClick={executeRedeem} style={{
+                  width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', fontWeight: 800,
+                  fontSize: '1.1rem', cursor: 'pointer', color: 'white',
+                  background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                  boxShadow: '0 8px 20px -4px rgba(139,92,246,0.5)',
+                  transition: 'transform 0.2s'
+                }}>✨ Confirm Claim</button>
+              </>
+            )}
+
+            {/* Step: Sending */}
+            {redeemStep === 'sending' && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}>
+                  <div style={{ fontSize: '36px', animation: 'spin 2s linear infinite' }}>⏳</div>
+                </div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>Sending DEGEN...</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 20 }}>
+                  Transferring {REWARD_AMOUNT} DEGEN to your wallet
+                </p>
+                <div style={{
+                  background: 'rgba(59,130,246,0.15)', borderRadius: 12, padding: '12px 16px',
+                  border: '1px solid rgba(59,130,246,0.3)', fontSize: '0.8rem', color: '#60a5fa'
+                }}>⛏️ Processing on Base network...</div>
+              </>
+            )}
+
+            {/* Step: Success! 🎉 */}
+            {redeemStep === 'success' && redeemResult && (
+              <>
+                <div style={{
+                  width: 100, height: 100, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '48px', animation: 'bounceIn 0.6s ease-out'
+                }}>🎉</div>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg, #22c55e, #86efac)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  +{redeemResult.degenSent} DEGEN!
+                </h2>
+                <p style={{ color: '#86efac', fontSize: '1rem', fontWeight: 600, marginBottom: 20 }}>
+                  Successfully sent to your wallet! 🚀
+                </p>
+                <div style={{
+                  background: 'rgba(34,197,94,0.1)', borderRadius: 16, padding: 16, marginBottom: 20,
+                  border: '1px solid rgba(34,197,94,0.2)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: '2rem' }}>🎩</span>
+                    <span style={{ fontSize: '1.6rem', fontWeight: 900 }}>{redeemResult.degenSent} DEGEN</span>
+                  </div>
+                  {redeemResult.txHash && (
+                    <a href={`https://basescan.org/tx/${redeemResult.txHash}`} target="_blank" rel="noopener noreferrer"
+                      style={{ color: '#60a5fa', fontSize: '0.75rem', textDecoration: 'underline', wordBreak: 'break-all' }}>
+                      View on BaseScan ↗
+                    </a>
+                  )}
+                </div>
+                <button onClick={() => setShowRedeemModal(false)} style={{
+                  width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', fontWeight: 800,
+                  fontSize: '1.1rem', cursor: 'pointer', color: 'white',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  boxShadow: '0 8px 20px -4px rgba(34,197,94,0.4)'
+                }}>🎊 Awesome!</button>
+              </>
+            )}
+
+            {/* Step: Error */}
+            {redeemStep === 'error' && redeemResult && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px'
+                }}>❌</div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>Redeem Failed</h2>
+                <p style={{ color: '#fca5a5', fontSize: '0.85rem', marginBottom: 20 }}>{redeemResult.error}</p>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button onClick={() => { setRedeemStep('confirm'); }} style={{
+                    flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer'
+                  }}>Try Again</button>
+                  <button onClick={() => setShowRedeemModal(false)} style={{
+                    flex: 1, padding: '12px 0', borderRadius: 12, border: 'none',
+                    background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 700, cursor: 'pointer'
+                  }}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

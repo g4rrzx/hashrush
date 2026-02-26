@@ -17,7 +17,7 @@ import { ethers } from 'ethers';
 
 const BASE_RPC = 'https://mainnet.base.org';
 const DEGEN_CONTRACT = '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed';
-const MIN_HP_REDEEM = 2500;
+const MIN_HP_REDEEM = 5000;
 const DEGEN_REWARD = 20; // 20 DEGEN per redeem
 const REDEEM_COOLDOWN_HOURS = 24;
 
