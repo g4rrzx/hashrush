@@ -200,6 +200,11 @@ export default function Home() {
   const [claimStep, setClaimStep] = useState<'confirm' | 'paying' | 'verifying' | 'success' | 'error'>('confirm');
   const [claimResult, setClaimResult] = useState<{ claimed?: number; newBalance?: number; txHash?: string; error?: string } | null>(null);
 
+  // Rig Purchase Modal State
+  const [showBuyModal, setShowBuyModal] = useState<'preview' | 'buying' | 'success' | null>(null);
+  const [buyPreviewItem, setBuyPreviewItem] = useState<typeof HARDWARE_ITEMS[0] | null>(null);
+  const [buySuccessData, setBuySuccessData] = useState<{ item: typeof HARDWARE_ITEMS[0]; oldHashRate: number; newHashRate: number } | null>(null);
+
   // Wallet connection
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -887,6 +892,16 @@ export default function Home() {
       }
     }
 
+    // Show preview modal instead of directly buying
+    setBuyPreviewItem(item);
+    setShowBuyModal('preview');
+    haptic('light');
+  };
+
+  const handleBuyConfirm = async () => {
+    if (!buyPreviewItem) return;
+    const item = buyPreviewItem;
+    setShowBuyModal('buying');
     setIsTransacting(true);
     haptic('medium');
 
@@ -935,12 +950,14 @@ export default function Home() {
     } catch (error) {
       console.error('Buy error:', error);
       showToast('❌', 'Purchase failed');
+      setShowBuyModal(null);
     } finally {
       setIsTransacting(false);
     }
   };
 
   const completeHardwarePurchase = (item: typeof HARDWARE_ITEMS[0], newHashRate: number) => {
+    const oldHashRate = hashRate;
     setHashRate(newHashRate);
     setInventory(i => ({ ...i, rigs: i.rigs + 1 }));
     setOwnedHardware(prev => {
@@ -951,7 +968,9 @@ export default function Home() {
       return [...prev, { id: item.id, count: 1, totalBoost: item.boost }];
     });
     setTransactions(prev => [...prev, { type: 'buy', amount: `+${item.boost} MH/s`, time: Date.now() }]);
-    showToast(item.icon, `${item.name} installed!`);
+    setBuySuccessData({ item, oldHashRate, newHashRate });
+    setShowBuyModal('success');
+    triggerConfetti();
     haptic('heavy');
   };
 
@@ -1529,7 +1548,168 @@ export default function Home() {
 
       {/* Welcome popup removed - offline gains applied silently */}
 
+      {/* ─── Rig Purchase Modal ─── */}
+      {showBuyModal && buyPreviewItem && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9998,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+        }} onClick={() => showBuyModal === 'preview' && setShowBuyModal(null)}>
+          <div style={{
+            width: '100%', maxWidth: 480,
+            background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+            borderRadius: '28px 28px 0 0', padding: '28px 24px 36px',
+            color: 'white', boxShadow: '0 -20px 60px rgba(0,0,0,0.5)'
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* PREVIEW STATE */}
+            {showBuyModal === 'preview' && (
+              <>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: 18, fontSize: '2rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 8px 20px rgba(99,102,241,0.4)'
+                  }}>{buyPreviewItem.icon}</div>
+                  <div>
+                    <h2 style={{ fontSize: '1.35rem', fontWeight: 900, marginBottom: 2 }}>{buyPreviewItem.name}</h2>
+                    <p style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Mining Hardware Upgrade</p>
+                  </div>
+                </div>
+
+                {/* Stats Comparison */}
+                <div style={{
+                  background: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 16,
+                  border: '1px solid rgba(255,255,255,0.08)', marginBottom: 16
+                }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Mining Power Impact
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1, textAlign: 'center', background: 'rgba(239,68,68,0.1)', borderRadius: 12, padding: 12 }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f87171' }}>{hashRate}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Current MH/s</div>
+                    </div>
+                    <div style={{ fontSize: '1.5rem' }}>→</div>
+                    <div style={{ flex: 1, textAlign: 'center', background: 'rgba(34,197,94,0.15)', borderRadius: 12, padding: 12, border: '1px solid rgba(34,197,94,0.3)' }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#4ade80' }}>{hashRate + buyPreviewItem.boost}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#86efac' }}>After MH/s 🚀</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, textAlign: 'center' }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                      color: 'white', borderRadius: 20, padding: '4px 12px',
+                      fontSize: '0.8rem', fontWeight: 800
+                    }}>+{buyPreviewItem.boost} MH/s boost ⚡</span>
+                  </div>
+                </div>
+
+                {/* HP Per Hour */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20
+                }}>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, textAlign: 'center' }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fbbf24' }}>
+                      {((hashRate + buyPreviewItem.boost) / 1000 * 3600).toFixed(1)}
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>HP / Hour (new)</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, textAlign: 'center' }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#a78bfa' }}>
+                      {((hashRate + buyPreviewItem.boost) / 1000 * 3600 / 1000 * 24).toFixed(2)}h
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Time to fill 1000 HP</div>
+                  </div>
+                </div>
+
+                {/* Price + Buy CTA */}
+                <button onClick={handleBuyConfirm} style={{
+                  width: '100%', padding: '16px 0', borderRadius: 16, border: 'none',
+                  background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                  color: 'white', fontWeight: 900, fontSize: '1.1rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  boxShadow: '0 8px 24px rgba(99,102,241,0.4)', transition: 'transform 0.1s',
+                }}>
+                  ⚡ Buy for {buyPreviewItem.price} ETH
+                </button>
+                <button onClick={() => setShowBuyModal(null)} style={{
+                  width: '100%', marginTop: 10, padding: '12px 0', borderRadius: 14,
+                  border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
+                  color: '#94a3b8', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer'
+                }}>Cancel</button>
+              </>
+            )}
+
+            {/* BUYING/WAITING STATE */}
+            {showBuyModal === 'buying' && (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  animation: 'pulse 1.5s ease-in-out infinite', fontSize: '2.5rem'
+                }}>⛏️</div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>Confirm in Wallet</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                  Approve the transaction for {buyPreviewItem.price} ETH in your wallet
+                </p>
+                <div style={{
+                  marginTop: 20, background: 'rgba(59,130,246,0.15)', borderRadius: 12,
+                  padding: '12px 16px', border: '1px solid rgba(59,130,246,0.3)',
+                  fontSize: '0.8rem', color: '#60a5fa'
+                }}>👆 Check your wallet popup...</div>
+              </div>
+            )}
+
+            {/* SUCCESS STATE */}
+            {showBuyModal === 'success' && buySuccessData && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  width: 100, height: 100, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '3rem', animation: 'bounceIn 0.6s ease-out'
+                }}>🎉</div>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg, #22c55e, #86efac)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  Rig Installed!
+                </h2>
+                <p style={{ color: '#86efac', fontSize: '0.95rem', fontWeight: 600, marginBottom: 20 }}>
+                  {buySuccessData.item.name} is now mining for you! ⚡
+                </p>
+                <div style={{
+                  background: 'rgba(34,197,94,0.1)', borderRadius: 16, padding: 16, marginBottom: 20,
+                  border: '1px solid rgba(34,197,94,0.2)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Rig Added</span>
+                    <span style={{ fontWeight: 700, color: '#4ade80' }}>{buySuccessData.item.icon} {buySuccessData.item.name}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Boost</span>
+                    <span style={{ fontWeight: 700, color: '#fbbf24' }}>+{buySuccessData.item.boost} MH/s</span>
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>New Hashrate</span>
+                    <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#22c55e' }}>{buySuccessData.newHashRate} MH/s 🚀</span>
+                  </div>
+                </div>
+                <button onClick={() => setShowBuyModal(null)} style={{
+                  width: '100%', padding: '14px 0', borderRadius: 16, border: 'none',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  color: 'white', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer',
+                  boxShadow: '0 8px 20px -4px rgba(34,197,94,0.4)'
+                }}>🔥 Keep Mining!</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tap Game Removed */}
+
 
       {showOnboarding && (
         <div className="onboarding-overlay">
