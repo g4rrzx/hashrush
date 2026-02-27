@@ -9,11 +9,20 @@
  * - Server tidak percaya `hashRate` dari client
  * - Server recalculate hashrate dari rigs di DB
  * - Points buffer di-cap berdasarkan max offline time
+ * - Points buffer di-cap berdasarkan tier rig yang dimiliki user
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB, calcHashRate } from '@/lib/db';
 
 const MAX_OFFLINE_HOURS = 72; // Max 3 days offline mining
+
+// HP cap per rig tier — matches frontend HARDWARE_ITEMS hpCap
+const RIG_HP_CAPS: Record<string, number> = {
+    starter: 2000,
+    turbo: 3500,
+    farm: 6000,
+    quantum: 10000,
+};
 
 export async function POST(req: NextRequest) {
     try {
@@ -43,8 +52,14 @@ export async function POST(req: NextRequest) {
         // Points per second = hashRate / 1000
         const serverPointsGain = (serverHashRate / 1000) * elapsedSeconds;
 
-        // Current points = existing points + server-calculated gain (CAPPED AT 1000)
-        const currentServerPoints = Math.min(Number(user.points) + serverPointsGain, 1000);
+        // Dynamic HP cap: highest cap among user's rigs (default 1000 if no rigs)
+        const rigs = await sql`SELECT DISTINCT rig_type FROM rigs WHERE fid = ${fid}`;
+        const maxHp = rigs.length > 0
+            ? Math.max(...rigs.map((r: any) => RIG_HP_CAPS[r.rig_type] ?? 1000))
+            : 1000;
+
+        // Current points = existing points + server-calculated gain (CAPPED at user's maxHp)
+        const currentServerPoints = Math.min(Number(user.points) + serverPointsGain, maxHp);
 
         // Client-sent points tidak boleh > server-calculated (anti-cheat)
         const clientPoints = Number(data.points) || 0;
@@ -77,6 +92,7 @@ export async function POST(req: NextRequest) {
             success: true,
             serverHashRate,
             serverPoints: safePoints,
+            maxHp,
             streak: newStreak
         });
     } catch (err) {

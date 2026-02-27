@@ -49,10 +49,10 @@ const BADGES = [
 ];
 
 const HARDWARE_ITEMS = [
-  { id: 'starter', name: 'Starter GPU', boost: 10, price: '0.0005', icon: '💻' },
-  { id: 'turbo', name: 'Turbo Rig', boost: 50, price: '0.001', icon: '⚡' },
-  { id: 'farm', name: 'Mining Farm', boost: 200, price: '0.003', icon: '🏭' },
-  { id: 'quantum', name: 'Quantum Core', boost: 500, price: '0.005', icon: '🔮' },
+  { id: 'starter', name: 'Starter GPU', boost: 10, price: '0.0005', icon: '💻', hpCap: 2000 },
+  { id: 'turbo', name: 'Turbo Rig', boost: 50, price: '0.001', icon: '⚡', hpCap: 3500 },
+  { id: 'farm', name: 'Mining Farm', boost: 200, price: '0.003', icon: '🏭', hpCap: 6000 },
+  { id: 'quantum', name: 'Quantum Core', boost: 500, price: '0.005', icon: '🔮', hpCap: 10000 },
 ];
 
 const getTier = (hp: number) => {
@@ -110,6 +110,11 @@ export default function Home() {
   const [inventory, setInventory] = useState({ tickets: 0, tokens: 0, rigs: 1, spins: 0 });
   const [ownedHardware, setOwnedHardware] = useState<OwnedHardware[]>([{ id: 'starter', count: 1, totalBoost: 10 }]);
   const [hashRate, setHashRate] = useState(10);
+
+  // Dynamic HP cap: highest cap among all rigs the user owns. Default 1000 if no rig.
+  const maxHp = ownedHardware.length > 0
+    ? Math.max(...ownedHardware.map(h => HARDWARE_ITEMS.find(hw => hw.id === h.id)?.hpCap ?? 1000))
+    : 1000;
   const [tab, setTab] = useState<Tab>('mine');
   const [showWelcome, setShowWelcome] = useState(false);
   const [offlineGain, setOfflineGain] = useState(0);
@@ -571,8 +576,12 @@ export default function Home() {
           const elapsed = Math.min((Date.now() - lastMineAt) / 1000, 86400 * 3); // Max 3 days
           const gain = (serverUser.hashRate / 1000) * elapsed;
 
-          // Apply state from server — server is source of truth (Capped at 1000)
-          const totalPoints = Math.min(serverUser.points + gain, 1000);
+          // Apply state from server — server is source of truth
+          // Cap at the highest hpCap from user's rigs (or 1000 if none)
+          const loadMaxHp = serverUser.ownedHardware && serverUser.ownedHardware.length > 0
+            ? Math.max(...serverUser.ownedHardware.map((h: any) => HARDWARE_ITEMS.find(hw => hw.id === h.id)?.hpCap ?? 1000))
+            : 1000;
+          const totalPoints = Math.min(serverUser.points + gain, loadMaxHp);
           setPoints(totalPoints);
           pointsRef.current = totalPoints;
           setBalance(serverUser.balance);
@@ -719,9 +728,9 @@ export default function Home() {
     const streakMultiplier = streak >= 7 ? 1.5 : 1;
     const interval = setInterval(() => {
       setPoints(p => {
-        if (p >= 1000) return 1000; // Cap at 1000
-        const tickVal = (hashRate / 1000); // hashRate per second (since it updates every 1s)
-        const newVal = Math.min(p + tickVal, 1000); // Cap addition to 1000
+        if (p >= maxHp) return maxHp;
+        const tickVal = (hashRate / 1000);
+        const newVal = Math.min(p + tickVal, maxHp);
         pointsRef.current = newVal;
         return newVal;
       });
@@ -1839,8 +1848,12 @@ export default function Home() {
 
             <div className="hash-display">
               <div className="hash-label">Unclaimed Hash Power</div>
-              <div className="hash-value">{points.toFixed(2)}</div>
-              <div className="hash-unit">HP / 1000 HP</div>
+              <div className="hash-value" style={{ color: points >= maxHp ? '#f59e0b' : undefined }}>{Math.floor(points).toLocaleString()}</div>
+              <div className="hash-unit">
+                <span style={{ color: points >= maxHp ? '#f59e0b' : '#94a3b8' }}>
+                  {points >= maxHp ? '⚠️ Full! Claim now ' : ''}{Math.floor(points).toLocaleString()} / {maxHp.toLocaleString()} HP
+                </span>
+              </div>
               <div className="stats-row">
                 <div className="stat-pill" onClick={() => setShowHardware(true)} style={{ cursor: 'pointer' }}><Zap size={12} className="text-yellow-500" /><span className="stat-pill-value">{hashRate} MH/s</span></div>
                 <div className="stat-pill" onClick={() => setShowHardware(true)} style={{ cursor: 'pointer' }}><Cpu size={12} className="text-purple-500" /><span className="stat-pill-value">{inventory.rigs} Rigs</span></div>
