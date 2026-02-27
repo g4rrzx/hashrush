@@ -736,7 +736,7 @@ export default function Home() {
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [mining, hashRate, streak, isLoading]);
+  }, [mining, hashRate, streak, isLoading, maxHp]);
 
   useEffect(() => {
     if (!tapGameActive || tapTimeLeft <= 0) return;
