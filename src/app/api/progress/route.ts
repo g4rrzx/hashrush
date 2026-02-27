@@ -52,11 +52,11 @@ export async function POST(req: NextRequest) {
         // Points per second = hashRate / 1000
         const serverPointsGain = (serverHashRate / 1000) * elapsedSeconds;
 
-        // Dynamic HP cap: highest cap among user's rigs (default 1000 if no rigs)
+        // Dynamic HP cap: highest cap among user's rigs (default 2000 if no rigs, assuming Starter)
         const rigs = await sql`SELECT DISTINCT rig_type FROM rigs WHERE fid = ${fid}`;
         const maxHp = rigs.length > 0
-            ? Math.max(...rigs.map((r: any) => RIG_HP_CAPS[r.rig_type] ?? 1000))
-            : 1000;
+            ? Math.max(...rigs.map((r: any) => RIG_HP_CAPS[r.rig_type] ?? 2000))
+            : 2000;
 
         // Current points = existing points + server-calculated gain (CAPPED at user's maxHp)
         const currentServerPoints = Math.min(Number(user.points) + serverPointsGain, maxHp);

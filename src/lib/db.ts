@@ -126,8 +126,8 @@ export async function getUserData(fid: string) {
     quantum: 10000,
   };
   const maxHp = Object.keys(ownedHardware).length > 0
-    ? Math.max(...Object.keys(ownedHardware).map(hwId => RIG_HP_CAPS[hwId] ?? 1000))
-    : 1000;
+    ? Math.max(...Object.keys(ownedHardware).map(hwId => RIG_HP_CAPS[hwId] ?? 2000))
+    : 2000;
 
   return {
     fid: user.fid,
