@@ -727,14 +727,14 @@ export default function Home() {
     if (!mining || isLoading) return;
     const streakMultiplier = streak >= 7 ? 1.5 : 1;
     const interval = setInterval(() => {
+      const inc = (hashRate / 1000) * (0.9 + Math.random() * 0.2) * streakMultiplier;
       setPoints(p => {
         if (p >= maxHp) return maxHp;
-        const tickVal = (hashRate / 1000);
-        const newVal = Math.min(p + tickVal, maxHp);
+        const newVal = Math.min(p + inc, maxHp);
         pointsRef.current = newVal;
         return newVal;
       });
-    }, 1000);
+    }, 100);
     return () => clearInterval(interval);
   }, [mining, hashRate, streak, isLoading]);
 
@@ -1848,7 +1848,7 @@ export default function Home() {
 
             <div className="hash-display">
               <div className="hash-label">Unclaimed Hash Power</div>
-              <div className="hash-value" style={{ color: points >= maxHp ? '#f59e0b' : undefined }}>{Math.floor(points).toLocaleString()}</div>
+              <div className="hash-value" style={{ color: points >= maxHp ? '#f59e0b' : undefined }}>{points >= maxHp ? maxHp.toLocaleString() : points.toFixed(3)}</div>
               <div className="hash-unit">
                 <span style={{ color: points >= maxHp ? '#f59e0b' : '#94a3b8' }}>
                   {points >= maxHp ? '⚠️ Full! Claim now ' : ''}{Math.floor(points).toLocaleString()} / {maxHp.toLocaleString()} HP
