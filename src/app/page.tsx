@@ -566,8 +566,8 @@ export default function Home() {
           const elapsed = Math.min((Date.now() - lastMineAt) / 1000, 86400 * 3); // Max 3 days
           const gain = (serverUser.hashRate / 1000) * elapsed;
 
-          // Apply state from server — server is source of truth
-          const totalPoints = serverUser.points + gain;
+          // Apply state from server — server is source of truth (Capped at 1000)
+          const totalPoints = Math.min(serverUser.points + gain, 1000);
           setPoints(totalPoints);
           pointsRef.current = totalPoints;
           setBalance(serverUser.balance);
@@ -713,9 +713,14 @@ export default function Home() {
     if (!mining || isLoading) return;
     const streakMultiplier = streak >= 7 ? 1.5 : 1;
     const interval = setInterval(() => {
-      const inc = (hashRate / 1000) * (0.9 + Math.random() * 0.2) * streakMultiplier;
-      setPoints(p => { pointsRef.current = p + inc; return p + inc; });
-    }, 100);
+      setPoints(p => {
+        if (p >= 1000) return 1000; // Cap at 1000
+        const tickVal = (hashRate / 1000); // hashRate per second (since it updates every 1s)
+        const newVal = Math.min(p + tickVal, 1000); // Cap addition to 1000
+        pointsRef.current = newVal;
+        return newVal;
+      });
+    }, 1000);
     return () => clearInterval(interval);
   }, [mining, hashRate, streak, isLoading]);
 
@@ -1655,7 +1660,7 @@ export default function Home() {
             <div className="hash-display">
               <div className="hash-label">Unclaimed Hash Power</div>
               <div className="hash-value">{points.toFixed(2)}</div>
-              <div className="hash-unit">HP</div>
+              <div className="hash-unit">HP / 1000 HP</div>
               <div className="stats-row">
                 <div className="stat-pill" onClick={() => setShowHardware(true)} style={{ cursor: 'pointer' }}><Zap size={12} className="text-yellow-500" /><span className="stat-pill-value">{hashRate} MH/s</span></div>
                 <div className="stat-pill" onClick={() => setShowHardware(true)} style={{ cursor: 'pointer' }}><Cpu size={12} className="text-purple-500" /><span className="stat-pill-value">{inventory.rigs} Rigs</span></div>

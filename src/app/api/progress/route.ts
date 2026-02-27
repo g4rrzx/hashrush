@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
         // Points per second = hashRate / 1000
         const serverPointsGain = (serverHashRate / 1000) * elapsedSeconds;
 
-        // Current points = existing points + server-calculated gain
-        const currentServerPoints = Number(user.points) + serverPointsGain;
+        // Current points = existing points + server-calculated gain (CAPPED AT 1000)
+        const currentServerPoints = Math.min(Number(user.points) + serverPointsGain, 1000);
 
         // Client-sent points tidak boleh > server-calculated (anti-cheat)
         const clientPoints = Number(data.points) || 0;
