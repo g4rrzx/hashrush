@@ -118,12 +118,24 @@ export async function getUserData(fid: string) {
     ownedHardware[rig.rig_type].totalBoost += Number(rig.boost);
   }
 
+  // Calculate dynamic maxHp based on owned hardware
+  const RIG_HP_CAPS: Record<string, number> = {
+    starter: 2000,
+    turbo: 3500,
+    farm: 6000,
+    quantum: 10000,
+  };
+  const maxHp = Object.keys(ownedHardware).length > 0
+    ? Math.max(...Object.keys(ownedHardware).map(hwId => RIG_HP_CAPS[hwId] ?? 1000))
+    : 1000;
+
   return {
     fid: user.fid,
     walletAddress: user.wallet_address,
     username: user.username,
     pfpUrl: user.pfp_url,
-    points: Number(user.points),
+    points: Math.min(Number(user.points), maxHp), // Capped at their maxHp
+    maxHp, // Return maxHp so frontend knows it immediately
     balance: Number(user.balance),
     totalEarned: Number(user.total_earned),
     hashRate: Number(user.hash_rate),

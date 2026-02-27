@@ -577,11 +577,15 @@ export default function Home() {
           const gain = (serverUser.hashRate / 1000) * elapsed;
 
           // Apply state from server — server is source of truth
-          // Cap at the highest hpCap from user's rigs (or 1000 if none)
-          const loadMaxHp = serverUser.ownedHardware && serverUser.ownedHardware.length > 0
-            ? Math.max(...serverUser.ownedHardware.map((h: any) => HARDWARE_ITEMS.find(hw => hw.id === h.id)?.hpCap ?? 1000))
-            : 1000;
-          const totalPoints = Math.min(serverUser.points + gain, loadMaxHp);
+          // Use maxHp directly from server calculation
+          const totalPoints = Math.min(serverUser.points + gain, serverUser.maxHp);
+          // Owned hardware from server rigs
+          if (serverUser.ownedHardware && serverUser.ownedHardware.length > 0) {
+            setOwnedHardware(serverUser.ownedHardware);
+            const totalRigs = serverUser.ownedHardware.reduce((s: number, r: any) => s + r.count, 0);
+            setInventory(i => ({ ...i, rigs: Math.max(1, totalRigs) }));
+          }
+
           setPoints(totalPoints);
           pointsRef.current = totalPoints;
           setBalance(serverUser.balance);
@@ -597,13 +601,6 @@ export default function Home() {
             const remaining = Math.max(0, Math.floor((cooldownEnd - Date.now()) / 1000));
             setUserCooldown(remaining);
             console.log('[cooldown] Loaded from DB:', remaining, 'seconds remaining');
-          }
-
-          // Owned hardware from server rigs
-          if (serverUser.ownedHardware && serverUser.ownedHardware.length > 0) {
-            setOwnedHardware(serverUser.ownedHardware);
-            const totalRigs = serverUser.ownedHardware.reduce((s: number, r: any) => s + r.count, 0);
-            setInventory(i => ({ ...i, rigs: Math.max(1, totalRigs) }));
           }
 
           if (gain > 0) setOfflineGain(gain);
