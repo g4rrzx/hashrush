@@ -1616,7 +1616,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* HP Per Hour */}
+                {/* HP Per Hour & Time to Fill */}
                 <div style={{
                   display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20
                 }}>
@@ -1628,11 +1628,26 @@ export default function Home() {
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, textAlign: 'center' }}>
                     <div style={{ fontSize: '1rem', fontWeight: 800, color: '#a78bfa' }}>
-                      {((hashRate + buyPreviewItem.boost) / 1000 * 3600 / 1000 * 24).toFixed(2)}h
+                      {((Math.max(maxHp, buyPreviewItem.hpCap || 1000)) / ((hashRate + buyPreviewItem.boost) / 1000 * 3600)).toFixed(1)}h
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Time to fill 1000 HP</div>
+                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Time to fill {Math.max(maxHp, buyPreviewItem.hpCap || 1000).toLocaleString()} HP</div>
                   </div>
                 </div>
+
+                {/* Storage Unlock Info */}
+                {buyPreviewItem.hpCap && buyPreviewItem.hpCap > maxHp && (
+                  <div style={{
+                    background: 'rgba(245, 158, 11, 0.1)', borderRadius: 12, padding: '10px 14px',
+                    border: '1px solid rgba(245, 158, 11, 0.2)', marginBottom: 20,
+                    display: 'flex', alignItems: 'center', gap: 10
+                  }}>
+                    <div style={{ fontSize: '1.2rem' }}>📦</div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fcd34d' }}>Unlocks Larger Storage!</div>
+                      <div style={{ fontSize: '0.65rem', color: '#fde68a' }}>Max un-claimed HP increases to {buyPreviewItem.hpCap.toLocaleString()} HP</div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Price + Buy CTA */}
                 <button onClick={handleBuyConfirm} style={{
