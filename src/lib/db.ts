@@ -29,13 +29,26 @@ export async function initDB() {
       points NUMERIC DEFAULT 0,
       balance NUMERIC DEFAULT 0,
       total_earned NUMERIC DEFAULT 0,
+      total_zora_earned NUMERIC DEFAULT 0,
       hash_rate INTEGER DEFAULT 10,
       streak INTEGER DEFAULT 1,
       last_seen TIMESTAMPTZ DEFAULT NOW(),
       last_mine_at TIMESTAMPTZ DEFAULT NOW(),
       last_redeem_at TIMESTAMPTZ,
+      last_zora_redeem_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
+  `;
+
+  // Backward-safe migrations for existing deployments
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS total_zora_earned NUMERIC DEFAULT 0
+  `;
+
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS last_zora_redeem_at TIMESTAMPTZ
   `;
 
   await sql`
@@ -138,10 +151,12 @@ export async function getUserData(fid: string) {
     maxHp, // Return maxHp so frontend knows it immediately
     balance: Number(user.balance),
     totalEarned: Number(user.total_earned),
+    totalZoraEarned: Number(user.total_zora_earned || 0),
     hashRate: Number(user.hash_rate),
     streak: Number(user.streak),
     lastMineAt: user.last_mine_at,
     lastRedeemAt: user.last_redeem_at,
+    lastZoraRedeemAt: user.last_zora_redeem_at,
     ownedHardware: Object.values(ownedHardware),
   };
 }
