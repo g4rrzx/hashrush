@@ -15,6 +15,7 @@ const MIN_HP_REDEEM = 5000;
 const ZORA_REWARD_AMOUNT = 10;
 const ZORA_SYMBOL = "ZORA";
 const ZORA_MIN_HP_REDEEM = 10000;
+const ZORA_ICON_SRC = "/zora-orb.svg";
 const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
 
@@ -1484,7 +1485,9 @@ export default function Home() {
                   width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
                   background: 'linear-gradient(135deg, #10b981, #059669)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px'
-                }}>💠</div>
+                }}>
+                  <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 46, height: 46, borderRadius: '50%' }} />
+                </div>
                 <h2 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: 8 }}>Claim {ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h2>
                 <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>
                   Exchange {ZORA_MIN_HP_REDEEM.toLocaleString()} HP for {ZORA_REWARD_AMOUNT} ZORA tokens
@@ -1499,7 +1502,10 @@ export default function Home() {
                   </div>
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>You Receive</span>
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#34d399' }}>💠 {ZORA_REWARD_AMOUNT} ZORA</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#34d399' }}>
+                      <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 16, height: 16, borderRadius: '50%', display: 'inline-block', verticalAlign: 'text-bottom', marginRight: 6 }} />
+                      {ZORA_REWARD_AMOUNT} ZORA
+                    </span>
                   </div>
                 </div>
                 <p style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: 20 }}>
@@ -1532,7 +1538,7 @@ export default function Home() {
                 <div style={{
                   background: 'rgba(14,165,233,0.15)', borderRadius: 12, padding: '12px 16px',
                   border: '1px solid rgba(14,165,233,0.3)', fontSize: '0.8rem', color: '#38bdf8'
-                }}>💠 Processing on Base network...</div>
+                }}>Processing ZORA transfer on Base network...</div>
               </>
             )}
 
@@ -1555,7 +1561,7 @@ export default function Home() {
                   border: '1px solid rgba(34,197,94,0.2)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-                    <span style={{ fontSize: '2rem' }}>💠</span>
+                    <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 34, height: 34, borderRadius: '50%' }} />
                     <span style={{ fontSize: '1.6rem', fontWeight: 900 }}>{zoraRedeemResult.zoraSent} ZORA</span>
                   </div>
                   {zoraRedeemResult.txHash && (
@@ -2274,7 +2280,7 @@ export default function Home() {
                   justifyContent: 'center',
                   margin: '0 auto 16px'
                 }}>
-                  {zoraCooldown > 0 ? <Clock size={32} /> : <div style={{ fontSize: '32px' }}>💠</div>}
+                  {zoraCooldown > 0 ? <Clock size={32} /> : <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 34, height: 34, borderRadius: '50%' }} />}
                 </div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h3>
                 <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {ZORA_MIN_HP_REDEEM.toLocaleString()} HP Required</p>
