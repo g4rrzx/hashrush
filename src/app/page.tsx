@@ -12,6 +12,9 @@ const REWARD_AMOUNT = 20; // 20 DEGEN
 const CLAIM_FEE_ETH = "0x2BA7DEF3000"; // 0.000003 ETH = 3,000,000,000,000 wei
 const REWARD_SYMBOL = "DEGEN";
 const MIN_HP_REDEEM = 5000;
+const ZORA_REWARD_AMOUNT = 10;
+const ZORA_SYMBOL = "ZORA";
+const ZORA_MIN_HP_REDEEM = 10000;
 const BUILDER_CODE = "bc_8io601u8"; // REPLACE WITH YOUR CODE
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] });
 
@@ -199,6 +202,9 @@ export default function Home() {
   const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [redeemStep, setRedeemStep] = useState<'confirm' | 'sending' | 'success' | 'error'>('confirm');
   const [redeemResult, setRedeemResult] = useState<{ degenSent?: number; txHash?: string; error?: string } | null>(null);
+  const [showZoraRedeemModal, setShowZoraRedeemModal] = useState(false);
+  const [zoraRedeemStep, setZoraRedeemStep] = useState<'confirm' | 'sending' | 'success' | 'error'>('confirm');
+  const [zoraRedeemResult, setZoraRedeemResult] = useState<{ zoraSent?: number; txHash?: string; error?: string } | null>(null);
 
   // Claim Points Celebration Modal State
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -224,6 +230,7 @@ export default function Home() {
   const [canPlayTapGame, setCanPlayTapGame] = useState(false); // Default false, set true after load check
   const [contractPoolBalance, setContractPoolBalance] = useState<string>('0');
   const [userCooldown, setUserCooldown] = useState<number>(0);
+  const [zoraCooldown, setZoraCooldown] = useState<number>(0);
   const [referralCount, setReferralCount] = useState<number>(0);
   const [referralList, setReferralList] = useState<string[]>([]);
 
@@ -364,7 +371,17 @@ export default function Home() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [userCooldown > 0]);
+  }, [userCooldown]);
+
+  useEffect(() => {
+    if (zoraCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setZoraCooldown(prev => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [zoraCooldown]);
 
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add('dark');
@@ -601,6 +618,14 @@ export default function Home() {
             const remaining = Math.max(0, Math.floor((cooldownEnd - Date.now()) / 1000));
             setUserCooldown(remaining);
             console.log('[cooldown] Loaded from DB:', remaining, 'seconds remaining');
+          }
+
+          if (serverUser.lastZoraRedeemAt) {
+            const lastZoraRedeem = new Date(serverUser.lastZoraRedeemAt).getTime();
+            const zoraCooldownEnd = lastZoraRedeem + 24 * 3600 * 1000;
+            const zoraRemaining = Math.max(0, Math.floor((zoraCooldownEnd - Date.now()) / 1000));
+            setZoraCooldown(zoraRemaining);
+            console.log('[zora-cooldown] Loaded from DB:', zoraRemaining, 'seconds remaining');
           }
 
           if (gain > 0) setOfflineGain(gain);
@@ -1056,6 +1081,70 @@ export default function Home() {
     }
   };
 
+  // Redeem ZORA — Show celebration modal
+  const handleRedeemZoraRewards = async () => {
+    if (balance < ZORA_MIN_HP_REDEEM || isTransacting) {
+      showToast('❌', `Need ${ZORA_MIN_HP_REDEEM.toLocaleString()} HP minimum`);
+      return;
+    }
+
+    if (!walletConnected) {
+      await connectWallet();
+      return;
+    }
+
+    if (zoraCooldown > 0) {
+      const hrs = Math.ceil(zoraCooldown / 3600);
+      showToast('⏳', `ZORA cooldown active: Wait ${hrs}h`);
+      return;
+    }
+
+    setZoraRedeemResult(null);
+    setZoraRedeemStep('confirm');
+    setShowZoraRedeemModal(true);
+  };
+
+  // Actually execute the ZORA redeem after user confirms in modal
+  const executeZoraRedeem = async () => {
+    setZoraRedeemStep('sending');
+    setIsTransacting(true);
+    haptic('medium');
+
+    try {
+      const res = await fetch('/api/redeem-zora', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fid: String(context?.user?.fid),
+          walletAddress
+        })
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        setBalance(json.newBalance);
+        setZoraRedeemResult({ zoraSent: json.zoraSent, txHash: json.txHash });
+        setZoraRedeemStep('success');
+        if (soundEnabled) playKaching();
+        haptic('heavy');
+        triggerConfetti();
+        setTransactions(prev => [...prev, { type: 'redeem', amount: `+${json.zoraSent} ${ZORA_SYMBOL}`, time: Date.now() }]);
+        setZoraCooldown(86400);
+      } else {
+        setZoraRedeemResult({ error: json.error || 'ZORA redeem failed' });
+        setZoraRedeemStep('error');
+        if (json.serverBalance !== undefined) setBalance(json.serverBalance);
+        if (json.hoursLeft) setZoraCooldown(json.hoursLeft * 3600);
+      }
+    } catch (error) {
+      console.error('ZORA redeem error:', error);
+      setZoraRedeemResult({ error: 'Network error. Try again.' });
+      setZoraRedeemStep('error');
+    } finally {
+      setIsTransacting(false);
+    }
+  };
+
   const handleSpin = async () => {
     if (spinning || isTransacting) return;
 
@@ -1360,6 +1449,146 @@ export default function Home() {
                     background: 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer'
                   }}>Try Again</button>
                   <button onClick={() => setShowRedeemModal(false)} style={{
+                    flex: 1, padding: '12px 0', borderRadius: 12, border: 'none',
+                    background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 700, cursor: 'pointer'
+                  }}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 💠 ZORA Redeem Celebration Modal */}
+      {showZoraRedeemModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20
+        }} onClick={() => { if (zoraRedeemStep !== 'sending') setShowZoraRedeemModal(false); }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'linear-gradient(145deg, #1e293b, #0f172a)', borderRadius: 28, padding: '32px 24px',
+            maxWidth: 380, width: '100%', textAlign: 'center', color: 'white', position: 'relative',
+            border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            animation: 'slideUp 0.4s ease-out'
+          }}>
+            {zoraRedeemStep !== 'sending' && (
+              <button onClick={() => setShowZoraRedeemModal(false)} style={{
+                position: 'absolute', top: 12, right: 16, background: 'none', border: 'none',
+                color: 'rgba(255,255,255,0.5)', fontSize: '1.5rem', cursor: 'pointer'
+              }}>×</button>
+            )}
+
+            {zoraRedeemStep === 'confirm' && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px'
+                }}>💠</div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: 8 }}>Claim {ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>
+                  Exchange {ZORA_MIN_HP_REDEEM.toLocaleString()} HP for {ZORA_REWARD_AMOUNT} ZORA tokens
+                </p>
+                <div style={{
+                  background: 'rgba(16,185,129,0.15)', borderRadius: 16, padding: 16, marginBottom: 20,
+                  border: '1px solid rgba(16,185,129,0.3)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>You Pay</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>🔥 {ZORA_MIN_HP_REDEEM.toLocaleString()} HP</span>
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>You Receive</span>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#34d399' }}>💠 {ZORA_REWARD_AMOUNT} ZORA</span>
+                  </div>
+                </div>
+                <p style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: 20 }}>
+                  🔒 Sent directly to your wallet • No gas fee required
+                </p>
+                <button onClick={executeZoraRedeem} style={{
+                  width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', fontWeight: 800,
+                  fontSize: '1.1rem', cursor: 'pointer', color: 'white',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  boxShadow: '0 8px 20px -4px rgba(16,185,129,0.5)',
+                  transition: 'transform 0.2s'
+                }}>✨ Confirm Claim</button>
+              </>
+            )}
+
+            {zoraRedeemStep === 'sending' && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}>
+                  <div style={{ fontSize: '36px', animation: 'spin 2s linear infinite' }}>⏳</div>
+                </div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>Sending ZORA...</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 20 }}>
+                  Transferring {ZORA_REWARD_AMOUNT} ZORA to your wallet
+                </p>
+                <div style={{
+                  background: 'rgba(14,165,233,0.15)', borderRadius: 12, padding: '12px 16px',
+                  border: '1px solid rgba(14,165,233,0.3)', fontSize: '0.8rem', color: '#38bdf8'
+                }}>💠 Processing on Base network...</div>
+              </>
+            )}
+
+            {zoraRedeemStep === 'success' && zoraRedeemResult && (
+              <>
+                <div style={{
+                  width: 100, height: 100, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '48px', animation: 'bounceIn 0.6s ease-out'
+                }}>🎉</div>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg, #22c55e, #86efac)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  +{zoraRedeemResult.zoraSent} ZORA!
+                </h2>
+                <p style={{ color: '#86efac', fontSize: '1rem', fontWeight: 600, marginBottom: 20 }}>
+                  Successfully sent to your wallet! 🚀
+                </p>
+                <div style={{
+                  background: 'rgba(34,197,94,0.1)', borderRadius: 16, padding: 16, marginBottom: 20,
+                  border: '1px solid rgba(34,197,94,0.2)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: '2rem' }}>💠</span>
+                    <span style={{ fontSize: '1.6rem', fontWeight: 900 }}>{zoraRedeemResult.zoraSent} ZORA</span>
+                  </div>
+                  {zoraRedeemResult.txHash && (
+                    <a href={`https://basescan.org/tx/${zoraRedeemResult.txHash}`} target="_blank" rel="noopener noreferrer"
+                      style={{ color: '#60a5fa', fontSize: '0.75rem', textDecoration: 'underline', wordBreak: 'break-all' }}>
+                      View on BaseScan ↗
+                    </a>
+                  )}
+                </div>
+                <button onClick={() => setShowZoraRedeemModal(false)} style={{
+                  width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', fontWeight: 800,
+                  fontSize: '1.1rem', cursor: 'pointer', color: 'white',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  boxShadow: '0 8px 20px -4px rgba(34,197,94,0.4)'
+                }}>🎊 Awesome!</button>
+              </>
+            )}
+
+            {zoraRedeemStep === 'error' && zoraRedeemResult && (
+              <>
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px'
+                }}>❌</div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8 }}>ZORA Redeem Failed</h2>
+                <p style={{ color: '#fca5a5', fontSize: '0.85rem', marginBottom: 20 }}>{zoraRedeemResult.error}</p>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button onClick={() => { setZoraRedeemStep('confirm'); }} style={{
+                    flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer'
+                  }}>Try Again</button>
+                  <button onClick={() => setShowZoraRedeemModal(false)} style={{
                     flex: 1, padding: '12px 0', borderRadius: 12, border: 'none',
                     background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 700, cursor: 'pointer'
                   }}>Close</button>
@@ -1911,7 +2140,9 @@ export default function Home() {
               </div>
             ))}
 
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: 24, marginBottom: 16 }}>🎩 Redeem {REWARD_SYMBOL} ({balance.toLocaleString()} HP available)</h3>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: 24, marginBottom: 16 }}>
+              🎁 Redeem Rewards ({balance.toLocaleString()} HP available)
+            </h3>
 
             {/* Cooldown Warning - Show if cooldown active */}
             {userCooldown > 0 && (
@@ -1934,8 +2165,27 @@ export default function Home() {
               </div>
             )}
 
-            {/* USDC Redeem Card Centered */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            {zoraCooldown > 0 && (
+              <div style={{
+                background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+                border: '2px solid #10b981',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 16,
+                textAlign: 'center'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+                  <Clock size={20} className="text-emerald-600" />
+                  <span style={{ fontWeight: 800, color: '#065f46', fontSize: '1rem' }}>ZORA Cooldown Active</span>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#059669', marginBottom: 4 }}>
+                  {Math.floor(zoraCooldown / 3600)}h {Math.floor((zoraCooldown % 3600) / 60)}m
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#065f46' }}>Wait until ZORA cooldown ends to redeem again</p>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
               <button
                 onClick={handleRedeemRewards}
                 disabled={balance < MIN_HP_REDEEM || userCooldown > 0}
@@ -1988,6 +2238,61 @@ export default function Home() {
                     : balance >= MIN_HP_REDEEM
                       ? `✨ Ready to Claim ${REWARD_AMOUNT} ${REWARD_SYMBOL}`
                       : `Need ${(MIN_HP_REDEEM - balance).toLocaleString()} HP more`
+                  }
+                </div>
+              </button>
+
+              <button
+                onClick={handleRedeemZoraRewards}
+                disabled={balance < ZORA_MIN_HP_REDEEM || zoraCooldown > 0}
+                className="card"
+                style={{
+                  width: '100%',
+                  background: zoraCooldown > 0
+                    ? 'linear-gradient(135deg, #34d399 0%, #10b981 100%)'
+                    : balance >= ZORA_MIN_HP_REDEEM
+                      ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)'
+                      : '#f1f5f9',
+                  border: 'none',
+                  padding: '24px 20px',
+                  borderRadius: 24,
+                  cursor: balance >= ZORA_MIN_HP_REDEEM && zoraCooldown === 0 ? 'pointer' : 'not-allowed',
+                  color: balance >= ZORA_MIN_HP_REDEEM || zoraCooldown > 0 ? 'white' : '#94a3b8',
+                  boxShadow: balance >= ZORA_MIN_HP_REDEEM && zoraCooldown === 0 ? '0 10px 25px -5px rgba(14, 165, 233, 0.4)' : 'none',
+                  transition: 'all 0.3s ease',
+                  textAlign: 'center',
+                  opacity: zoraCooldown > 0 ? 0.7 : 1
+                }}
+              >
+                <div style={{
+                  width: 60,
+                  height: 60,
+                  background: balance >= ZORA_MIN_HP_REDEEM || zoraCooldown > 0 ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  {zoraCooldown > 0 ? <Clock size={32} /> : <div style={{ fontSize: '32px' }}>💠</div>}
+                </div>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h3>
+                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {ZORA_MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+                <p style={{ fontSize: '0.7rem', opacity: 0.75, marginBottom: 12 }}>🔒 Server sends ZORA automatically • No gas fee!</p>
+
+                <div style={{
+                  background: balance >= ZORA_MIN_HP_REDEEM || zoraCooldown > 0 ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                  padding: '8px 16px',
+                  borderRadius: 12,
+                  display: 'inline-block',
+                  fontSize: '0.85rem',
+                  fontWeight: 700
+                }}>
+                  {zoraCooldown > 0
+                    ? `⏳ ${Math.floor(zoraCooldown / 3600)}h ${Math.floor((zoraCooldown % 3600) / 60)}m remaining`
+                    : balance >= ZORA_MIN_HP_REDEEM
+                      ? `✨ Ready to Claim ${ZORA_REWARD_AMOUNT} ${ZORA_SYMBOL}`
+                      : `Need ${(ZORA_MIN_HP_REDEEM - balance).toLocaleString()} HP more`
                   }
                 </div>
               </button>
