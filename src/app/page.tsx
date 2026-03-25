@@ -66,6 +66,21 @@ const getTier = (hp: number) => {
   return { name: 'Bronze', icon: '🥉', class: 'tier-bronze' };
 };
 
+const ZoraIcon = ({ size = 32, withGlow = false }: { size?: number; withGlow?: boolean }) => (
+  <img
+    src={ZORA_ICON_SRC}
+    alt="ZORA"
+    style={{
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      objectFit: 'cover',
+      display: 'block',
+      boxShadow: withGlow ? '0 0 14px rgba(56,189,248,0.45)' : 'none'
+    }}
+  />
+);
+
 const playKaching = () => {
   try {
     const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhXWx9jJy2romZqZF0dH2TpqqhiHB2hZenrqKPgn55f4qWoJmLfXh8hZGak5CDe3p8g42VkIV8dnJ1fYiSkIqAd3J0e4WQko6GfnZzeH+Ij5CLhX54dHZ9hoyOi4V+eXZ3fIOJjImFf3t4d3uBhoqIhYF8eXd5fYSHh4WBfXp4eX2BhYaFgn57eXl7f4ODg4F+e3l5e36BgoKBf3x6eXp8f4GBgH98e3l5e36AgIB/fXt6enx+f4CAfn17enp7fX5/f358e3p6e31+fn5+fHt6ent8fX5+fXx7enp7fH1+fnx8e3p6e3x9fX18fHt6ent8fX19fHx7enp7fHx9fXx8e3p6e3x8fHx8e3t6ent8fHx8fHt7enp7fHx8fHx7e3p6e3t8fHx8e3t6enp7e3x8fHt7e3p6e3t7fHx8e3t7enp7e3t8e3t7e3p6e3t7e3t7e3t7enp7e3t7e3t7e3t6ent7e3t7e3t7e3p6e3t7e3t7');
@@ -1484,11 +1499,15 @@ export default function Home() {
                 <div style={{
                   width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
                   background: 'linear-gradient(135deg, #10b981, #059669)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 8px 20px rgba(16,185,129,0.35)'
                 }}>
-                  <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 46, height: 46, borderRadius: '50%' }} />
+                  <ZoraIcon size={48} withGlow />
                 </div>
-                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: 8 }}>Claim {ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h2>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <ZoraIcon size={24} />
+                  Claim {ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}
+                </h2>
                 <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>
                   Exchange {ZORA_MIN_HP_REDEEM.toLocaleString()} HP for {ZORA_REWARD_AMOUNT} ZORA tokens
                 </p>
@@ -1502,8 +1521,8 @@ export default function Home() {
                   </div>
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>You Receive</span>
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#34d399' }}>
-                      <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 16, height: 16, borderRadius: '50%', display: 'inline-block', verticalAlign: 'text-bottom', marginRight: 6 }} />
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <ZoraIcon size={16} />
                       {ZORA_REWARD_AMOUNT} ZORA
                     </span>
                   </div>
@@ -1561,7 +1580,7 @@ export default function Home() {
                   border: '1px solid rgba(34,197,94,0.2)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-                    <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 34, height: 34, borderRadius: '50%' }} />
+                    <ZoraIcon size={36} withGlow />
                     <span style={{ fontSize: '1.6rem', fontWeight: 900 }}>{zoraRedeemResult.zoraSent} ZORA</span>
                   </div>
                   {zoraRedeemResult.txHash && (
@@ -2278,9 +2297,10 @@ export default function Home() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  margin: '0 auto 16px'
+                  margin: '0 auto 16px',
+                  boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)'
                 }}>
-                  {zoraCooldown > 0 ? <Clock size={32} /> : <img src={ZORA_ICON_SRC} alt="ZORA" style={{ width: 34, height: 34, borderRadius: '50%' }} />}
+                  {zoraCooldown > 0 ? <Clock size={32} /> : <ZoraIcon size={34} />}
                 </div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h3>
                 <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {ZORA_MIN_HP_REDEEM.toLocaleString()} HP Required</p>
