@@ -2169,93 +2169,89 @@ export default function Home() {
               🎁 Redeem Rewards ({balance.toLocaleString()} HP available)
             </h3>
 
-            {/* Cooldown Warning - Show if cooldown active */}
-            {userCooldown > 0 && (
-              <div style={{
-                background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
-                border: '2px solid #f59e0b',
-                borderRadius: 16,
-                padding: 16,
-                marginBottom: 16,
-                textAlign: 'center'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
-                  <Clock size={20} className="text-amber-600" />
-                  <span style={{ fontWeight: 800, color: '#92400e', fontSize: '1rem' }}>Cooldown Active</span>
-                </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#d97706', marginBottom: 4 }}>
-                  {Math.floor(userCooldown / 3600)}h {Math.floor((userCooldown % 3600) / 60)}m
-                </div>
-                <p style={{ fontSize: '0.75rem', color: '#92400e' }}>Wait until cooldown ends to redeem again</p>
-              </div>
-            )}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
+              marginBottom: 8,
+              paddingInline: 2,
+              color: '#64748b',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              letterSpacing: '0.02em'
+            }}>
+              <div style={{ textAlign: 'center' }}>DEGEN</div>
+              <div style={{ textAlign: 'center' }}>ZORA</div>
+            </div>
 
-            {zoraCooldown > 0 && (
-              <div style={{
-                background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
-                border: '2px solid #10b981',
-                borderRadius: 16,
-                padding: 16,
-                marginBottom: 16,
-                textAlign: 'center'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
-                  <Clock size={20} className="text-emerald-600" />
-                  <span style={{ fontWeight: 800, color: '#065f46', fontSize: '1rem' }}>ZORA Cooldown Active</span>
-                </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#059669', marginBottom: 4 }}>
-                  {Math.floor(zoraCooldown / 3600)}h {Math.floor((zoraCooldown % 3600) / 60)}m
-                </div>
-                <p style={{ fontSize: '0.75rem', color: '#065f46' }}>Wait until ZORA cooldown ends to redeem again</p>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
               <button
                 onClick={handleRedeemRewards}
                 disabled={balance < MIN_HP_REDEEM || userCooldown > 0}
                 className="card"
                 style={{
                   width: '100%',
-                  maxWidth: 320,
                   background: userCooldown > 0
                     ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
                     : balance >= MIN_HP_REDEEM
                       ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                       : '#f1f5f9',
                   border: 'none',
-                  padding: '24px 20px',
-                  borderRadius: 24,
+                  padding: '18px 14px',
+                  borderRadius: 20,
                   cursor: balance >= MIN_HP_REDEEM && userCooldown === 0 ? 'pointer' : 'not-allowed',
                   color: balance >= MIN_HP_REDEEM || userCooldown > 0 ? 'white' : '#94a3b8',
                   boxShadow: balance >= MIN_HP_REDEEM && userCooldown === 0 ? '0 10px 25px -5px rgba(16, 185, 129, 0.4)' : 'none',
                   transition: 'all 0.3s ease',
                   textAlign: 'center',
-                  opacity: userCooldown > 0 ? 0.7 : 1
+                  opacity: userCooldown > 0 ? 0.7 : 1,
+                  minHeight: 245,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
                 }}
               >
                 <div style={{
-                  width: 60,
-                  height: 60,
+                  width: 52,
+                  height: 52,
                   background: balance >= MIN_HP_REDEEM || userCooldown > 0 ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  margin: '0 auto 16px'
+                  margin: '0 auto 12px'
                 }}>
-                  {userCooldown > 0 ? <Clock size={32} /> : <div style={{ fontSize: '32px' }}>🎩</div>}
+                  {userCooldown > 0 ? <Clock size={28} /> : <div style={{ fontSize: '28px' }}>🎩</div>}
                 </div>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{REWARD_AMOUNT} {REWARD_SYMBOL}</h3>
-                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
-                <p style={{ fontSize: '0.7rem', opacity: 0.75, marginBottom: 12 }}>🔒 Server sends DEGEN automatically • No gas fee!</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: 4 }}>{REWARD_AMOUNT} {REWARD_SYMBOL}</h3>
+                <p style={{ fontSize: '0.77rem', opacity: 0.9, marginBottom: 4 }}>Min {MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+                <p style={{ fontSize: '0.67rem', opacity: 0.75, marginBottom: 10, lineHeight: 1.35 }}>🔒 Server sends DEGEN automatically • No gas fee!</p>
+
+                {userCooldown > 0 && (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: '1px solid rgba(255,255,255,0.35)',
+                    borderRadius: 12,
+                    padding: '8px 8px',
+                    marginBottom: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    fontSize: '0.76rem',
+                    fontWeight: 800
+                  }}>
+                    <Clock size={14} />
+                    Cooldown {Math.floor(userCooldown / 3600)}h {Math.floor((userCooldown % 3600) / 60)}m
+                  </div>
+                )}
 
                 <div style={{
                   background: balance >= MIN_HP_REDEEM || userCooldown > 0 ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
-                  padding: '8px 16px',
+                  padding: '8px 10px',
                   borderRadius: 12,
                   display: 'inline-block',
-                  fontSize: '0.85rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700
                 }}>
                   {userCooldown > 0
@@ -2279,39 +2275,62 @@ export default function Home() {
                       ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)'
                       : '#f1f5f9',
                   border: 'none',
-                  padding: '24px 20px',
-                  borderRadius: 24,
+                  padding: '18px 14px',
+                  borderRadius: 20,
                   cursor: balance >= ZORA_MIN_HP_REDEEM && zoraCooldown === 0 ? 'pointer' : 'not-allowed',
                   color: balance >= ZORA_MIN_HP_REDEEM || zoraCooldown > 0 ? 'white' : '#94a3b8',
                   boxShadow: balance >= ZORA_MIN_HP_REDEEM && zoraCooldown === 0 ? '0 10px 25px -5px rgba(14, 165, 233, 0.4)' : 'none',
                   transition: 'all 0.3s ease',
                   textAlign: 'center',
-                  opacity: zoraCooldown > 0 ? 0.7 : 1
+                  opacity: zoraCooldown > 0 ? 0.7 : 1,
+                  minHeight: 245,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
                 }}
               >
                 <div style={{
-                  width: 60,
-                  height: 60,
+                  width: 52,
+                  height: 52,
                   background: balance >= ZORA_MIN_HP_REDEEM || zoraCooldown > 0 ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  margin: '0 auto 16px',
+                  margin: '0 auto 12px',
                   boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)'
                 }}>
-                  {zoraCooldown > 0 ? <Clock size={32} /> : <ZoraIcon size={34} />}
+                  {zoraCooldown > 0 ? <Clock size={28} /> : <ZoraIcon size={30} />}
                 </div>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 4 }}>{ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h3>
-                <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: 4 }}>Min {ZORA_MIN_HP_REDEEM.toLocaleString()} HP Required</p>
-                <p style={{ fontSize: '0.7rem', opacity: 0.75, marginBottom: 12 }}>🔒 Server sends ZORA automatically • No gas fee!</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: 4 }}>{ZORA_REWARD_AMOUNT} {ZORA_SYMBOL}</h3>
+                <p style={{ fontSize: '0.77rem', opacity: 0.9, marginBottom: 4 }}>Min {ZORA_MIN_HP_REDEEM.toLocaleString()} HP Required</p>
+                <p style={{ fontSize: '0.67rem', opacity: 0.75, marginBottom: 10, lineHeight: 1.35 }}>🔒 Server sends ZORA automatically • No gas fee!</p>
+
+                {zoraCooldown > 0 && (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: '1px solid rgba(255,255,255,0.35)',
+                    borderRadius: 12,
+                    padding: '8px 8px',
+                    marginBottom: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    fontSize: '0.76rem',
+                    fontWeight: 800
+                  }}>
+                    <Clock size={14} />
+                    Cooldown {Math.floor(zoraCooldown / 3600)}h {Math.floor((zoraCooldown % 3600) / 60)}m
+                  </div>
+                )}
 
                 <div style={{
                   background: balance >= ZORA_MIN_HP_REDEEM || zoraCooldown > 0 ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
-                  padding: '8px 16px',
+                  padding: '8px 10px',
                   borderRadius: 12,
                   display: 'inline-block',
-                  fontSize: '0.85rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700
                 }}>
                   {zoraCooldown > 0
