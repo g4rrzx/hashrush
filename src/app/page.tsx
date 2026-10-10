@@ -169,7 +169,7 @@ export default function Home() {
   // Fetch Leaderboard
   const fetchLeaderboard = async () => {
     try {
-      const res = await sdk.quickAuth.fetch('/api/leaderboard');
+      const res = await fetch('/api/leaderboard');
       const data = await res.json();
       if (Array.isArray(data)) {
         setLeaderboardData(data);
