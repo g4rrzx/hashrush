@@ -11,6 +11,7 @@
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB } from '@/lib/db';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 const BASE_RPC = 'https://mainnet.base.org';
 const CONTRACT_ADDRESS = '0xA9D32A2Dbc4edd616bb0f61A6ddDDfAa1ef18C63';
@@ -108,12 +109,15 @@ export async function POST(req: NextRequest) {
     try {
         await initDB();
 
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
+
         const body = await req.json();
-        const { fid, walletAddress, txHash, amount } = body;
+        const { txHash, amount } = body;
         console.log(`[claim] Request: fid=${fid}, txHash=${txHash}, amount=${amount}`);
 
-        if (!fid || !txHash || !amount) {
-            return Response.json({ error: 'fid, txHash, and amount required' }, { status: 400 });
+        if (!txHash || !amount) {
+            return Response.json({ error: 'txHash and amount required' }, { status: 400 });
         }
 
         // 1. Anti-replay: check if TX was already used
@@ -131,13 +135,10 @@ export async function POST(req: NextRequest) {
         }
         const user = users[0];
 
-        // 3. Wallet check
-        const userWallet = walletAddress || user.wallet_address;
-        if (walletAddress && user.wallet_address) {
-            if (user.wallet_address.toLowerCase() !== walletAddress.toLowerCase()) {
-                console.warn(`[claim] Wallet mismatch: ${walletAddress} vs ${user.wallet_address}`);
-                return Response.json({ error: 'Wallet address mismatch' }, { status: 403 });
-            }
+        // 3. Wallet check — payouts/verification use the wallet bound to the authenticated user
+        const userWallet = user.wallet_address;
+        if (!userWallet) {
+            return Response.json({ error: 'No wallet address found' }, { status: 400 });
         }
 
         // 4. Verify TX on-chain

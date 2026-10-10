@@ -6,6 +6,7 @@
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB } from '@/lib/db';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 const REFERRAL_BONUS_INVITER = 500; // HP bonus untuk pengundang
 const REFERRAL_BONUS_INVITEE = 500; // HP bonus untuk yang diundang
@@ -13,12 +14,8 @@ const REFERRAL_BONUS_INVITEE = 500; // HP bonus untuk yang diundang
 export async function GET(req: NextRequest) {
     try {
         await initDB();
-        const { searchParams } = new URL(req.url);
-        const fid = searchParams.get('fid');
-
-        if (!fid) {
-            return Response.json({ error: 'FID required' }, { status: 400 });
-        }
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
 
         // Ambil daftar referral yang dilakukan user ini
         const referrals = await sql`
@@ -44,18 +41,36 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         await initDB();
-        const { inviterFid, inviteeFid, inviteeUsername } = await req.json();
 
-        if (!inviterFid || !inviteeFid) {
-            return Response.json({ error: 'inviterFid and inviteeFid required' }, { status: 400 });
+        // The authenticated user is the INVITEE (they just arrived via the referral link).
+        const inviteeFid = await getAuthFid(req);
+        if (!inviteeFid) return unauthorized();
+
+        const { inviterFid } = await req.json();
+
+        if (!inviterFid) {
+            return Response.json({ error: 'inviterFid required' }, { status: 400 });
         }
+        const inviter = String(inviterFid);
 
         // Jangan referral diri sendiri
-        if (inviterFid === inviteeFid) {
+        if (inviter === inviteeFid) {
             return Response.json({ error: 'Cannot refer yourself' }, { status: 400 });
         }
 
-        // Cek apakah invitee sudah pernah didaftarkan
+        // Inviter harus user nyata (FID acak ditolak → tidak bisa farming bonus).
+        const inviterRows = await sql`SELECT fid FROM users WHERE fid = ${inviter}`;
+        if (inviterRows.length === 0) {
+            return Response.json({ error: 'Inviter not found' }, { status: 404 });
+        }
+
+        // Invitee harus user nyata (biasanya sudah dibuat saat connect).
+        const inviteeRows = await sql`SELECT fid FROM users WHERE fid = ${inviteeFid}`;
+        if (inviteeRows.length === 0) {
+            return Response.json({ error: 'Invitee not found' }, { status: 404 });
+        }
+
+        // Cek apakah invitee sudah pernah didaftarkan (satu bonus per invitee)
         const existing = await sql`
       SELECT 1 FROM referrals WHERE invitee_fid = ${inviteeFid}
     `;
@@ -64,16 +79,10 @@ export async function POST(req: NextRequest) {
             return Response.json({ success: false, message: 'Already referred' });
         }
 
-        // Pastikan inviter ada di DB
-        const inviterRows = await sql`SELECT fid FROM users WHERE fid = ${inviterFid}`;
-        if (inviterRows.length === 0) {
-            return Response.json({ error: 'Inviter not found' }, { status: 404 });
-        }
-
         // Insert referral
         await sql`
       INSERT INTO referrals (inviter_fid, invitee_fid, bonus_awarded)
-      VALUES (${inviterFid}, ${inviteeFid}, ${REFERRAL_BONUS_INVITER})
+      VALUES (${inviter}, ${inviteeFid}, ${REFERRAL_BONUS_INVITER})
       ON CONFLICT (invitee_fid) DO NOTHING
     `;
 
@@ -83,7 +92,7 @@ export async function POST(req: NextRequest) {
         balance = balance + ${REFERRAL_BONUS_INVITER},
         total_earned = total_earned + ${REFERRAL_BONUS_INVITER},
         last_seen = NOW()
-      WHERE fid = ${inviterFid}
+      WHERE fid = ${inviter}
     `;
 
         // Juga berikan bonus ke invitee (dipastikan bisa apply waktu pertama load)
@@ -94,7 +103,7 @@ export async function POST(req: NextRequest) {
       WHERE fid = ${inviteeFid}
     `;
 
-        console.log(`[referral] ${inviterFid} referred ${inviteeFid}. Both get ${REFERRAL_BONUS_INVITER} HP.`);
+        console.log(`[referral] ${inviter} referred ${inviteeFid}. Both get ${REFERRAL_BONUS_INVITER} HP.`);
 
         return Response.json({
             success: true,

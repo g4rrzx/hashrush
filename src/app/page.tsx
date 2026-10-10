@@ -149,7 +149,7 @@ export default function Home() {
     if (!context?.user?.fid) return;
 
     try {
-      await fetch('/api/leaderboard', {
+      await sdk.quickAuth.fetch('/api/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,7 +169,7 @@ export default function Home() {
   // Fetch Leaderboard
   const fetchLeaderboard = async () => {
     try {
-      const res = await fetch('/api/leaderboard');
+      const res = await sdk.quickAuth.fetch('/api/leaderboard');
       const data = await res.json();
       if (Array.isArray(data)) {
         setLeaderboardData(data);
@@ -296,7 +296,7 @@ export default function Home() {
         // Enroll/update user in Neon DB with wallet address
         if (context?.user?.fid) {
           try {
-            await fetch('/api/user', {
+            await sdk.quickAuth.fetch('/api/user', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -431,13 +431,11 @@ export default function Home() {
 
     if (ref && ref !== String(context.user.fid)) {
       // Call server — server checks duplicates in DB, NOT localStorage
-      fetch('/api/referral', {
+      sdk.quickAuth.fetch('/api/referral', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inviterFid: ref,
-          inviteeFid: String(context.user.fid),
-          inviteeUsername: context.user.username
+          inviterFid: ref
         })
       })
         .then(r => r.json())
@@ -464,7 +462,7 @@ export default function Home() {
     const fetchReferralStats = async () => {
       if (!context?.user?.fid) return;
       try {
-        const res = await fetch(`/api/referral?fid=${context.user.fid}`);
+        const res = await sdk.quickAuth.fetch(`/api/referral?fid=${context.user.fid}`);
         const data = await res.json();
         if (data.count !== undefined) setReferralCount(data.count);
         if (data.referrals) setReferralList(data.referrals);
@@ -547,7 +545,7 @@ export default function Home() {
     if (!context?.user?.fid) return;
 
     try {
-      await fetch('/api/progress', {
+      await sdk.quickAuth.fetch('/api/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -589,7 +587,7 @@ export default function Home() {
 
       // 1. Upsert user in Neon DB (create if new, or fetch existing)
       try {
-        const res = await fetch('/api/user', {
+        const res = await sdk.quickAuth.fetch('/api/user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -720,7 +718,7 @@ export default function Home() {
     const syncToServer = async () => {
       if (!context?.user?.fid) return;
       try {
-        const res = await fetch('/api/progress', {
+        const res = await sdk.quickAuth.fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -885,7 +883,7 @@ export default function Home() {
       if (txHash) {
         setClaimStep('verifying');
 
-        const res = await fetch('/api/claim', {
+        const res = await sdk.quickAuth.fetch('/api/claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -976,7 +974,7 @@ export default function Home() {
 
       if (txHash) {
         // [SECURE] Validate buy rig with Server
-        const res = await fetch('/api/rigs', {
+        const res = await sdk.quickAuth.fetch('/api/rigs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1063,7 +1061,7 @@ export default function Home() {
     haptic('medium');
 
     try {
-      const res = await fetch('/api/redeem', {
+      const res = await sdk.quickAuth.fetch('/api/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1127,7 +1125,7 @@ export default function Home() {
     haptic('medium');
 
     try {
-      const res = await fetch('/api/redeem-zora', {
+      const res = await sdk.quickAuth.fetch('/api/redeem-zora', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -10,20 +10,16 @@
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB, getUserData, calcHashRate } from '@/lib/db';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 // GET /api/progress/[fid]
-export async function GET(
-    req: NextRequest,
-    { params }: { params: Promise<{ fid: string }> }
-) {
-    const { fid } = await params;
-
+export async function GET(req: NextRequest) {
     try {
         await initDB();
 
-        if (!fid) {
-            return Response.json({ success: false, error: 'FID required' }, { status: 400 });
-        }
+        // Identity comes from the verified token, not the URL.
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
 
         const user = await getUserData(fid);
 

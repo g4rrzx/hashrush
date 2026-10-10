@@ -14,6 +14,7 @@
 import { NextRequest } from 'next/server';
 import { sql, initDB } from '@/lib/db';
 import { ethers } from 'ethers';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 const BASE_RPC = 'https://mainnet.base.org';
 const DEGEN_CONTRACT = '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed';
@@ -63,11 +64,8 @@ async function sendDegen(toAddress: string, amount: number): Promise<{ success: 
 export async function POST(req: NextRequest) {
     try {
         await initDB();
-        const { fid, walletAddress } = await req.json();
-
-        if (!fid) {
-            return Response.json({ error: 'fid required' }, { status: 400 });
-        }
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
 
         // 1. Ambil user dari DB
         const users = await sql`SELECT * FROM users WHERE fid = ${fid}`;
@@ -76,8 +74,8 @@ export async function POST(req: NextRequest) {
         }
         const user = users[0];
 
-        // 2. Determine wallet address
-        const targetWallet = walletAddress || user.wallet_address;
+        // 2. Payout wallet is bound to the authenticated user — never from the body
+        const targetWallet = user.wallet_address;
         if (!targetWallet) {
             return Response.json({ error: 'No wallet address found' }, { status: 400 });
         }

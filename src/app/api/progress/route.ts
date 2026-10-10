@@ -13,6 +13,7 @@
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB, calcHashRate } from '@/lib/db';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 const MAX_OFFLINE_HOURS = 72; // Max 3 days offline mining
 
@@ -27,11 +28,14 @@ const RIG_HP_CAPS: Record<string, number> = {
 export async function POST(req: NextRequest) {
     try {
         await initDB();
-        const body = await req.json();
-        const { fid, data } = body;
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
 
-        if (!fid || !data) {
-            return Response.json({ error: 'fid and data required' }, { status: 400 });
+        const body = await req.json();
+        const { data } = body;
+
+        if (!data) {
+            return Response.json({ error: 'data required' }, { status: 400 });
         }
 
         // Ambil user dari DB

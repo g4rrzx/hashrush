@@ -6,6 +6,7 @@
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB } from '@/lib/db';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 export async function GET() {
     try {
@@ -36,24 +37,32 @@ export async function GET() {
 export async function POST(req: NextRequest) {
     try {
         await initDB();
-        const { fid, username, score, tier, pfpUrl } = await req.json();
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
 
-        if (!fid) {
-            return Response.json({ error: 'fid required' }, { status: 400 });
+        const { username, pfpUrl } = await req.json();
+
+        // Score is computed server-side from the user's real DB state — never trusted from the client.
+        const users = await sql`SELECT username, pfp_url, total_earned, balance FROM users WHERE fid = ${fid}`;
+        if (users.length === 0) {
+            return Response.json({ error: 'User not found' }, { status: 404 });
         }
+        const u = users[0];
+        const score = Math.floor(Number(u.total_earned || 0) + Number(u.balance || 0));
+        const tier = score >= 50000 ? 'Diamond' : score >= 10000 ? 'Gold' : score >= 1000 ? 'Silver' : 'Bronze';
 
         await sql`
       INSERT INTO leaderboard (fid, username, pfp_url, score, tier, updated_at)
-      VALUES (${fid}, ${username || null}, ${pfpUrl || null}, ${score || 0}, ${tier || 'Bronze'}, NOW())
+      VALUES (${fid}, ${u.username || username || null}, ${u.pfp_url || pfpUrl || null}, ${score}, ${tier}, NOW())
       ON CONFLICT (fid) DO UPDATE SET
-        username = COALESCE(${username || null}, leaderboard.username),
-        pfp_url = COALESCE(${pfpUrl || null}, leaderboard.pfp_url),
-        score = GREATEST(${score || 0}, leaderboard.score),
-        tier = ${tier || 'Bronze'},
+        username = COALESCE(${u.username || username || null}, leaderboard.username),
+        pfp_url = COALESCE(${u.pfp_url || pfpUrl || null}, leaderboard.pfp_url),
+        score = GREATEST(${score}, leaderboard.score),
+        tier = ${tier},
         updated_at = NOW()
     `;
 
-        return Response.json({ success: true });
+        return Response.json({ success: true, score, tier });
     } catch (err) {
         console.error('[/api/leaderboard POST]', err);
         return Response.json({ error: 'Internal error' }, { status: 500 });

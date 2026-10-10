@@ -9,16 +9,13 @@
  */
 import { NextRequest } from 'next/server';
 import { sql, initDB, getUserData, calcHashRate } from '@/lib/db';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
     try {
         await initDB();
-        const { searchParams } = new URL(req.url);
-        const fid = searchParams.get('fid');
-
-        if (!fid) {
-            return Response.json({ error: 'fid required' }, { status: 400 });
-        }
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
 
         const user = await getUserData(fid);
         if (!user) {
@@ -35,11 +32,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         await initDB();
-        const { fid, walletAddress, username, pfpUrl } = await req.json();
+        const fid = await getAuthFid(req);
+        if (!fid) return unauthorized();
 
-        if (!fid) {
-            return Response.json({ error: 'fid required' }, { status: 400 });
-        }
+        const { walletAddress, username, pfpUrl } = await req.json();
 
         // Check apakah user sudah ada
         const existing = await sql`SELECT fid FROM users WHERE fid = ${fid}`;

@@ -12,6 +12,7 @@
 import { NextRequest } from 'next/server';
 import { sql, initDB } from '@/lib/db';
 import { ethers } from 'ethers';
+import { getAuthFid, unauthorized } from '@/lib/auth';
 
 const BASE_RPC = 'https://mainnet.base.org';
 const ZORA_CONTRACT = '0x1111111111166b7FE7bd91427724B487980aFc69';
@@ -71,11 +72,8 @@ async function sendZora(
 export async function POST(req: NextRequest) {
   try {
     await initDB();
-    const { fid, walletAddress } = await req.json();
-
-    if (!fid) {
-      return Response.json({ error: 'fid required' }, { status: 400 });
-    }
+    const fid = await getAuthFid(req);
+    if (!fid) return unauthorized();
 
     const users = await sql`SELECT * FROM users WHERE fid = ${fid}`;
     if (users.length === 0) {
@@ -83,7 +81,8 @@ export async function POST(req: NextRequest) {
     }
     const user = users[0];
 
-    const targetWallet = walletAddress || user.wallet_address;
+    // Payout wallet is bound to the authenticated user — never from the body
+    const targetWallet = user.wallet_address;
     if (!targetWallet) {
       return Response.json({ error: 'No wallet address found' }, { status: 400 });
     }
