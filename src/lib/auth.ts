@@ -58,3 +58,20 @@ export async function getAuthFid(req: Request): Promise<string | null> {
 export function unauthorized(): Response {
   return Response.json({ error: 'Unauthorized' }, { status: 401 });
 }
+
+/**
+ * Admin gate: the request must carry a valid Quick Auth token whose FID is in
+ * the `ADMIN_FIDS` allowlist (comma-separated). Fail-closed — if `ADMIN_FIDS`
+ * is unset, nobody is admin and the endpoint is disabled.
+ */
+export async function requireAdmin(req: Request): Promise<string | null> {
+  const admins = (process.env.ADMIN_FIDS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (admins.length === 0) return null;
+
+  const fid = await getAuthFid(req);
+  if (!fid) return null;
+  return admins.includes(fid) ? fid : null;
+}

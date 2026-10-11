@@ -1,11 +1,28 @@
 // Send notification to all users API
 import { NextRequest } from 'next/server';
+import { requireAdmin, unauthorized } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://37.114.34.131:3001';
 
-// POST - Send notification to all subscribed users
+// Only Farcaster notification endpoints may be fetched (SSRF guard).
+const ALLOWED_NOTIFY_HOSTS = ['api.farcaster.xyz', 'api.warpcast.com'];
+
+function isAllowedNotifyUrl(raw: unknown): raw is string {
+    if (typeof raw !== 'string') return false;
+    try {
+        const u = new URL(raw);
+        return u.protocol === 'https:' && ALLOWED_NOTIFY_HOSTS.includes(u.hostname);
+    } catch {
+        return false;
+    }
+}
+
+// POST - Send notification to all subscribed users (admin only)
 export async function POST(req: NextRequest) {
     try {
+        const adminFid = await requireAdmin(req);
+        if (!adminFid) return unauthorized();
+
         const body = await req.json();
         const { title, message, targetUrl } = body;
 
@@ -28,8 +45,16 @@ export async function POST(req: NextRequest) {
         // Send notification to each user
         let sentCount = 0;
         let failCount = 0;
+        let skippedCount = 0;
 
         for (const user of tokens) {
+            // Skip any token whose callback URL is not a Farcaster endpoint.
+            if (!isAllowedNotifyUrl(user?.url)) {
+                skippedCount++;
+                console.warn(`Skipped FID ${user?.fid}: disallowed notify URL`);
+                continue;
+            }
+
             try {
                 const notifyRes = await fetch(user.url, {
                     method: 'POST',
@@ -60,6 +85,7 @@ export async function POST(req: NextRequest) {
             success: true,
             sent: sentCount,
             failed: failCount,
+            skipped: skippedCount,
             total: tokens.length
         });
     } catch (error) {
